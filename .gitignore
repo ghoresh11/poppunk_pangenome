@@ -1,3 +1,15 @@
+
+## John Lee's scripts
+extract_distances.py
+calculate_rand_indices.py
+
+## list of assembly files
+assemblies.txt
+
+## outputs of different Ks for poppunk
+clusters/
+chosen_K_11/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

@@ -2,7 +2,7 @@ library(ggplot2)
 library(RColorBrewer)
 library(reshape2)
 
-setwd("/Users/gh11/e_colis/poppunk/dists_analysis/")
+setwd("/Users/gh11/poppunk_pangenome/dists_analysis/")
 
 
 cluster_sizes = read.table("cluster_sizes.csv", sep = ",",
@@ -147,32 +147,55 @@ ggplot(roary_outputs.m, aes(y = value, x = core_dist, fill = variable)) + geom_p
 
 
 
-
-
-
-
-##### Requires running another script
-### Look at the metadata within each cluster
-within_cluster_metadata = read.table("metadata_per_cluster.csv", sep = "\t", header = T,
-                                     comment.char = "", stringsAsFactors = F, quote = "")
-within_cluster_metadata$cluster = as.character(within_cluster_metadata$cluster)
-
-
-
-ST = within_cluster_metadata[which(within_cluster_metadata$variable == "ST"),c(1,3,4)]
-ST_factorised = unique(ST$value)
-ST$value = factor(ST$value, ST_factorised)
-common = unique(ST$value[which(ST$count>0.70)])
-cols = brewer.pal(n = length(common), "Paired")
-for (i in 1:length(common)){
-  c = common[i]
-  ST_factorised[ST_factorised == c] = cols[i]
+### look at the gene lengths within each type of gene (rare, core, soft_core ...)
+gene_lengths = read.table("Gene_lengths.csv", sep = ",", header = T,
+                          stringsAsFactors = F)
+gene_lengths$Type = factor(gene_lengths$Type , rev(c("rare","inter","soft_core", "core")))
+labs = c()
+for (type in rev(c("rare","inter",  "soft_core", "core"))){
+  labs = c(labs,paste(type,"\n(",length(which(gene_lengths$Type == type)), ")", sep = ""))
 }
-ST_factorised[which(!ST_factorised %in% cols)] = "white"
+ggplot(gene_lengths, aes(x = Type, y = Length, fill = Type)) +
+  geom_violin(trim=FALSE) +
+  geom_boxplot(width=0.1) +
+  scale_fill_brewer(palette = "Blues", guide = F, direction = -1) +
+  theme_bw(base_size = 16) + ylab("Gene length (aa)") + xlab("") + 
+  scale_x_discrete(labels = labs)
 
-ggplot(ST, aes(x = cluster, y = count, fill = value)) + geom_bar(stat = "identity", color = "black")+
-  scale_fill_manual(values = ST_factorised,guide = F)
+median(gene_lengths$Length[which(gene_lengths$Type == "core")])
+median(gene_lengths$Length[which(gene_lengths$Type == "soft_core")])
+median(gene_lengths$Length[which(gene_lengths$Type == "inter")])
+median(gene_lengths$Length[which(gene_lengths$Type == "rare")])
+
+## stratify by cluster
+gene_lengths$Cluster = factor(gene_lengths$Cluster, 1:39)
+core_lengths = gene_lengths[which(gene_lengths$Type == "core"),]
+ggplot(core_lengths, aes(x = Cluster, y = Length)) + geom_boxplot()
+soft_core_lengths = gene_lengths[which(gene_lengths$Type == "soft_core"),]
+ggplot(soft_core_lengths, aes(x = Cluster, y = Length)) + geom_boxplot()
+inter = gene_lengths[which(gene_lengths$Type == "inter"),]
+ggplot(inter, aes(x = Cluster, y = Length)) + geom_boxplot()
+rare = gene_lengths[which(gene_lengths$Type == "rare"),]
+ggplot(rare, aes(x = Cluster, y = Length)) + geom_boxplot()
 
 
 
-test = read.table("../functions/summary_core_functions.txt", sep = ",", header = F, stringsAsFactors = F)
+## zoom in 
+gene_lengths = gene_lengths[-which(gene_lengths$Length > 500), ]
+labs = c()
+for (type in rev(c("rare","inter",  "soft_core", "core"))){
+  labs = c(labs,paste(type,"\n(",length(which(gene_lengths$Type == type)), ")", sep = ""))
+}
+ggplot(gene_lengths, aes(x = Type, y = Length, fill = Type)) +
+  geom_violin(trim=FALSE) +
+  geom_boxplot(width=0.1) +
+  scale_fill_brewer(palette = "Blues", guide = F, direction = -1) +
+  theme_bw(base_size = 16) + ylab("Gene length (aa)") + xlab("") + 
+  scale_x_discrete(labels = labs)
+
+ggplot(gene_lengths, aes(x = Length, fill = Type)) + geom_density(alpha = 0.6) +
+  scale_fill_brewer(palette = "Blues", guide = F, direction = -1)  +
+  theme_classic(base_size = 16) + xlab("Gene length (aa)") + ylab("Density")  
+
+
+

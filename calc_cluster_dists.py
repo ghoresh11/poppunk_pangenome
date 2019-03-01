@@ -74,7 +74,7 @@ def metadata_per_cluster(metadata_file, cluster_sizes, clusters, min_cluster_siz
     return: nothing'''
 
     ## variables to ouput in file
-    variables = ["Pathotype", "Country", "Continent", "Year","Isolation", "ST", "MASH"]
+    variables = ["Pathotype", "Publication", "Continent", "Year","Isolation", "ST", "MASH"]
     clusters_metadata = {}
     with open(metadata_file) as f:
         for line in f:
@@ -97,6 +97,39 @@ def metadata_per_cluster(metadata_file, cluster_sizes, clusters, min_cluster_siz
                 for i in range(len(variables)):
                     curr_value = toks[indexs[i]]
                     v = variables[i]
+                    ## fix the metadata outputs:
+                    curr_value = curr_value.replace("~","") ## remove "~" from STs
+                    if v == "Isolation" and curr_value not in ["feces","urine","blood"]:
+                        curr_value = "other/unknown"
+                    elif "ehec" in curr_value:
+                        curr_value = "ehec"
+                    elif "aeec" in curr_value:
+                        curr_value = "epec/eaec"
+                    elif curr_value == "upec":
+                        curr_value = "expec"
+                    elif v == "Year":
+                        curr_value = curr_value.replace("s","")
+                        curr_value = curr_value.split("-")
+                        try:
+                            curr_value = map(int, curr_value)
+                            curr_value = mean(curr_value)
+                        except Exception:
+                            curr_value = "nd"
+                    elif "public health england" in curr_value:
+                        curr_value = "phe"
+                    elif "fda" in curr_value or "food and drug administration" in curr_value:
+                        curr_value = "fda"
+                    elif "sanger" in curr_value:
+                        curr_value = "sanger"
+                    elif "centers for disease control" in curr_value or "cdc" in curr_value:
+                        curr_value = "cdc"
+                    elif "kallonen2017_bsac" in curr_value:
+                        curr_value = "bsac"
+                    elif "hazen2013" in curr_value:
+                        curr_value = "hazen2013"
+                    elif "ingle2016" in curr_value:
+                        curr_value = "ingle2016"
+
                     ## this value has never been seen for this cluster
                     if curr_value not in clusters_metadata[cluster][v]:
                         clusters_metadata[cluster][v][curr_value] = 0
@@ -109,7 +142,7 @@ def metadata_per_cluster(metadata_file, cluster_sizes, clusters, min_cluster_siz
     for cluster in clusters_metadata:
         for var in clusters_metadata[cluster]:
             for value in clusters_metadata[cluster][var]:
-                out.write("\t".join([cluster, var, value, str(clusters_metadata[cluster][var][value] / float(cluster_sizes[cluster]))]) + "\n")
+                out.write("\t".join([cluster, var, str(value), str(clusters_metadata[cluster][var][value] / float(cluster_sizes[cluster]))]) + "\n")
     out.close()
     return
 

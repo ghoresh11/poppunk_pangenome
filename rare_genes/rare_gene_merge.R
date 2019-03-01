@@ -2,7 +2,7 @@ library(ggplot2)
 library(RColorBrewer)
 
 
-setwd("/Users/gh11/e_colis/poppunk/rare_genes/")
+setwd("/Users/gh11/poppunk_pangenome/rare_genes/")
 
 
 df = read.table("rare_filtering_summary.csv", sep = ",",
@@ -31,7 +31,9 @@ cluster_sizes = read.table("../dists_analysis/cluster_sizes.csv", sep = ",",
 df = cbind(df, Size = cluster_sizes$Size[match(df$Cluster, cluster_sizes$Cluster)])
 
 fifty = df[which(df$Threshold == 50),]
-ggplot(fifty, aes(x = Size, y = Decrease)) + geom_point()
+ggplot(fifty, aes(x = Size, y = Decrease)) + geom_point(size = 2.5, alpha = 0.6) +
+  theme_bw(base_size = 16) + xlab("Cluster size") + ylab("%decrease in number of rare genes")
+  
 
 eighty = df[which(df$Threshold == 80),]
 ggplot(eighty, aes(x = Size, y = Decrease)) + geom_point()

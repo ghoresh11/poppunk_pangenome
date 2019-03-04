@@ -1,6 +1,6 @@
 import argparse
 import os
-from numpy import mean
+from numpy import mean, median
 import time
 
 def assemblies_to_gffs(metadata_file):
@@ -71,11 +71,13 @@ def metadata_per_cluster(metadata_file, cluster_sizes, clusters, min_cluster_siz
     where I know exactly how many of each ST, pathotype, etc. are in each of the
     poppunk clusters
     output: melted dataframe with cluster and count of each number from each category
-    return: nothing'''
+    return: a dictionary with each of the metadata objects for each strains
+    (to be used for the distances ouput)'''
 
     ## variables to ouput in file
     variables = ["Pathotype", "Publication", "Continent", "Year","Isolation", "ST", "MASH"]
     clusters_metadata = {}
+    all_metadata = {}
     with open(metadata_file) as f:
         for line in f:
             toks = line.strip().split("\t")
@@ -90,6 +92,8 @@ def metadata_per_cluster(metadata_file, cluster_sizes, clusters, min_cluster_siz
                 cluster = clusters[a]
                 if cluster_sizes[cluster] < min_cluster_size:
                     continue
+
+                all_metadata[a] = {}
                 if cluster not in clusters_metadata:
                     clusters_metadata[cluster] = {}
                     for v in variables:
@@ -135,6 +139,7 @@ def metadata_per_cluster(metadata_file, cluster_sizes, clusters, min_cluster_siz
                         clusters_metadata[cluster][v][curr_value] = 0
                     ## add count by one for this value in this variable in this cluster
                     clusters_metadata[cluster][v][curr_value] += 1
+                    all_metadata[a][v] = curr_value
 
     ## generate the melted output file -> easy to work with in R
     out = open(os.path.join(out,"metadata_per_cluster.csv"),"w")
@@ -144,9 +149,9 @@ def metadata_per_cluster(metadata_file, cluster_sizes, clusters, min_cluster_siz
             for value in clusters_metadata[cluster][var]:
                 out.write("\t".join([cluster, var, str(value), str(clusters_metadata[cluster][var][value] / float(cluster_sizes[cluster]))]) + "\n")
     out.close()
-    return
+    return all_metadata
 
-def get_dist_within_cluster(clusters, cluster_sizes, dists_file, out, min_cluster_size, fa_to_gff):
+def get_dist_within_cluster(clusters, cluster_sizes, dists_file, out, min_cluster_size, fa_to_gff, metadata):
     ''' Due to memory constrains, read the dists file line by line.
     Check membership of both clusters, if they are different ignore,
     if they are the same but the cluster is too small also ignore
@@ -154,8 +159,14 @@ def get_dist_within_cluster(clusters, cluster_sizes, dists_file, out, min_cluste
     Otherwise, save the core and acc dists of this cluster
     to be used for ROARY input and save all the GFF files of this clusters to
     a file to be used by ROARY
-    Return: dictionary with cluster -> core and accessory distance'''
+    Return: dictionary with cluster -> core and accessory distance
+    Output: a file summarising all the within-cluster distances with metadata'''
     print("Calculating within-cluster distances...")
+
+    md_out = open(os.path.join(out, "metadata_within_cluster.csv"), "w")
+    metadata_vals = metadata.values()[0].keys()
+    header = ['{}_{}'.format(a, b) for b in ["1","2"] for a in metadata_vals]
+    md_out.write("Member_1, Member_2, Cluster, Core_dist, Acc_dist, " + ",".join(header) + "\n")
     within_cluster_dist = {}
     gffs = {}
     cnt = 0
@@ -174,21 +185,32 @@ def get_dist_within_cluster(clusters, cluster_sizes, dists_file, out, min_cluste
             within_cluster_dist[cluster]["acc"].append(float(toks[3]))
             gffs[cluster].add(fa_to_gff[toks[0]])
             gffs[cluster].add(fa_to_gff[toks[1]])
+
+            md_out.write(",".join([toks[0], toks[1], cluster, toks[2], toks[3]]))
+            for j in [0,1]: ## get all the metadata values for toks[0] and toks[1]
+                for v in metadata_vals:
+                    md_out.write("," + str(metadata[toks[j]][v]))
+            md_out.write("\n")
+
             # if cnt == 10000: ## if testing uncomment here
             #     break
-            cnt += 1
-
+            # cnt += 1
+    md_out.close()
     ## calc the averages
     ## generate output so that this doesn't need to be repeated
     with open(os.path.join(out, "within_cluster_dist.csv"),"w") as f_out:
-        f_out.write("Cluster, Core, Core_max, Acc, Acc_max\n")
+        f_out.write("Cluster, Core, Core_max, Core_median, Acc, Acc_max, Acc_median\n")
         for cluster in within_cluster_dist:
             core_max = max(within_cluster_dist[cluster]["core"])
             acc_max = max(within_cluster_dist[cluster]["acc"])
-            within_cluster_dist[cluster]["core"] = mean(within_cluster_dist[cluster]["core"])
-            within_cluster_dist[cluster]["acc"] =  mean(within_cluster_dist[cluster]["acc"])
-            f_out.write(",".join(map(str, [cluster, within_cluster_dist[cluster]["core"], core_max, within_cluster_dist[cluster]["acc"], acc_max])) + "\n")
-    ## create the GFF outputs
+            mean_core = mean(within_cluster_dist[cluster]["core"])
+            mean_acc =  mean(within_cluster_dist[cluster]["acc"])
+            core_median = median(within_cluster_dist[cluster]["core"])
+            acc_median = median(within_cluster_dist[cluster]["acc"])
+            f_out.write(",".join(map(str, [cluster, mean_core, core_max, core_median,
+                                            mean_acc, acc_max, acc_median])) + "\n")
+
+    ## create the GFF outputs -> for running Roary
     out = os.path.abspath(os.path.join(out,"gff_jobs"))
     try:
         os.makedirs(out)
@@ -198,7 +220,7 @@ def get_dist_within_cluster(clusters, cluster_sizes, dists_file, out, min_cluste
         with open(os.path.join(out, "jobs_" + cluster + ".txt"), "w") as f_out:
             for gff in gffs[cluster]:
                 f_out.write(gff + "\n")
-    return within_cluster_dist
+    return
 
 
 def add_clusters_to_dists(between_cluster_dist, cluster1, cluster2, core, accessory):
@@ -211,18 +233,28 @@ def add_clusters_to_dists(between_cluster_dist, cluster1, cluster2, core, access
     between_cluster_dist[cluster1][cluster2]["accessory"].append(accessory)
     return
 
-def between_cluster_dist(clusters, within_cluster_dist, dists_file, fa_to_gff, out):
+def between_cluster_dist(clusters, cluster_sizes, min_cluster_size, dists_file, fa_to_gff, out, metadata):
     ''' read the dists file again, this time I only care about the
     distance between two clusters that I decided to keep, therefore
     the number of calculations on the whole file is still small '''
     print("Calculating between-cluster distances...")
     between_cluster_dist = {}
+
+    md_out = open(os.path.join(out, "metadata_between_clusters.csv"), "w")
+    metadata_vals = metadata.values()[0].keys()
+    header = ['{}_{}'.format(a, b) for b in ["1","2"] for a in metadata_vals]
+    md_out.write("Member_1, Member_2, Cluster_1, Cluster_2, Core_dist, Acc_dist, " + ",".join(header) + "\n")
+
+    cnt = 0
     with open(dists_file) as f:
         for line in f:
             toks = line.strip().split("\t")
             if line.startswith("Query"):
                 continue
-            if  clusters[toks[0]] == clusters[toks[1]] or clusters[toks[0]] not in within_cluster_dist or clusters[toks[1]] not in within_cluster_dist:
+            if  clusters[toks[0]] == clusters[toks[1]]: ## same cluster
+                continue
+            ## the cluster size is too small
+            if cluster_sizes[clusters[toks[0]]] < min_cluster_size or cluster_sizes[clusters[toks[1]]] < min_cluster_size:
                 continue
             cluster1 = int(clusters[toks[0]])
             cluster2 = int(clusters[toks[1]])
@@ -230,19 +262,30 @@ def between_cluster_dist(clusters, within_cluster_dist, dists_file, fa_to_gff, o
                 add_clusters_to_dists(between_cluster_dist, cluster1, cluster2, float(toks[2]), float(toks[3]))
             else:
                 add_clusters_to_dists(between_cluster_dist, cluster2, cluster1, float(toks[2]), float(toks[3]))
+            md_out.write(",".join(map(str,[toks[0], toks[1], cluster1, cluster2, toks[2], toks[3]])))
+            for j in [0,1]: ## get all the metadata values for toks[0] and toks[1]
+                for v in metadata_vals:
+                    md_out.write("," + str(metadata[toks[j]][v]))
+            md_out.write("\n")
+            # if cnt == 10000: ## if testing uncomment here
+            #     break
+            # cnt += 1
+    md_out.close()
 
     cluster_ids = between_cluster_dist.keys()
     with open(os.path.join(out, "between_cluster_dist.csv"),"w") as f_out:
-        f_out.write("cluster1, cluster2, core, core_max, accessory, accessory_max\n")
+        f_out.write("cluster1, cluster2, core, core_max, core_median, accessory, accessory_max, accessory_median\n")
         for c1 in cluster_ids:
             for c2 in cluster_ids:
                 if c2 <= c1:
                     continue
                 core_max = max(between_cluster_dist[c1][c2]["core"])
                 core_mean = mean(between_cluster_dist[c1][c2]["core"])
+                core_median = median(between_cluster_dist[c1][c2]["core"])
                 acc_max = max(between_cluster_dist[c1][c2]["accessory"])
                 acc_mean = mean(between_cluster_dist[c1][c2]["accessory"])
-                f_out.write(",".join(map(str, [c1, c2, core_mean, core_max, acc_mean, acc_max])) + "\n")
+                acc_median = median(between_cluster_dist[c1][c2]["accessory"])
+                f_out.write(",".join(map(str, [c1, c2, core_mean, core_max, core_median, cc_mean, acc_max, acc_median])) + "\n")
     return
 
 
@@ -251,11 +294,10 @@ def run(args):
     args.metadata_file = os.path.abspath(args.metadata_file)
     fa_to_gff = assemblies_to_gffs(args.metadata_file)
     clusters, cluster_sizes = get_cluster_sizes(args.clusters_file, args.out)
-    metadata_per_cluster(args.metadata_file, cluster_sizes, clusters, args.min_cluster_size, args.out)
-    quit()
+    all_metadata = metadata_per_cluster(args.metadata_file, cluster_sizes, clusters, args.min_cluster_size, args.out)
     within_cluster_dist = get_dist_within_cluster(clusters, cluster_sizes,
-    args.dists_file, args.out, args.min_cluster_size, fa_to_gff)
-    between_cluster_dist(clusters, within_cluster_dist, args.dists_file, fa_to_gff, args.out)
+    args.dists_file, args.out, args.min_cluster_size, fa_to_gff, all_metadata)
+    between_cluster_dist(clusters, cluster_sizes, args.min_cluster_size,  args.dists_file, fa_to_gff, args.out, all_metadata)
     return
 
 
@@ -289,4 +331,4 @@ if __name__ == "__main__":
     options = get_options()
     run(options)
     end = time.time()
-    print(end - start)
+    print("Time: %s" %str(end - start))

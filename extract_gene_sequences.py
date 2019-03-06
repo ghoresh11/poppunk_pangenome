@@ -3,6 +3,8 @@ import os
 from Bio.SeqIO.FastaIO import SimpleFastaParser
 import subprocess
 from Bio.Seq import translate
+from csv import reader
+
 
 
 def get_input_dirs(input_dir):
@@ -14,6 +16,9 @@ def get_input_dirs(input_dir):
     dirs_to_return = []
     for d in directories:
         if os.path.isfile(os.path.join(d, "pan_genome_reference.fa")) and os.path.isfile(os.path.join(d, "gene_presence_absence.csv")) and os.path.isfile(os.path.join(d, "gene_presence_absence.Rtab")):
+            # for debugging, uncomment:
+            # if d.split("/")[-1].split("_")[0] != "39":
+            #     continue
             dirs_to_return.append(d)
     return dirs_to_return
 
@@ -44,8 +49,6 @@ def get_gene_sequences(input_dirs, gene_freqs):
     These will be used to postprocess the rare genes, and later
     to compare between different clusters.'''
     print("Getting the gene sequences....")
-    out = open("Gene_lengths.csv", "w")
-    out.write("Cluster, Type, Length\n")
     for d in input_dirs:
         cluster = d.split("/")[-1].split("_")[0]
         print(d)
@@ -59,48 +62,64 @@ def get_gene_sequences(input_dirs, gene_freqs):
                 protein_sequence = translate(values[1])
                 if curr_cluster[gene_name] < 0.15:
                     outputs["rare"].write(">" + values[0] + "\n" + protein_sequence + "\n")
-                    out.write(cluster + ",rare, " + str(len(protein_sequence)) + "\n")
                 elif curr_cluster[gene_name] < 0.95:
                     outputs["inter"].write(">" + values[0] + "\n" + protein_sequence + "\n")
-                    out.write(cluster + ",inter, " + str(len(protein_sequence)) + "\n")
                 elif curr_cluster[gene_name] < 0.99:
                     outputs["soft_core"].write(">" + values[0] + "\n" + protein_sequence + "\n")
-                    out.write(cluster + ",soft_core, " + str(len(protein_sequence)) + "\n")
                 else:
                     outputs["core"].write(">" + values[0] + "\n" + protein_sequence + "\n")
-                    out.write(cluster + ",core, " + str(len(protein_sequence)) + "\n")
         for o in outputs:
             outputs[o].close()
-    out.close()
     return
 
-def summarise_functional_annotations(input_dirs, gene_freqs):
-    ''' Use the presence absence CSV file to count the functional annotations
-    of the genes from the different groups in each cluster'''
-    print("Getting functional annotations....")
+def check_size(cluster_count, v, avg_length, short_gene_cuttoff):
+    if avg_length >= short_gene_cuttoff:
+        cluster_count[v]["not_small"] += 1
+    else:
+        cluster_count[v]["small"] += 1
+    return
+
+def create_roary_summary(input_dirs, gene_freqs, short_gene_cuttoff):
+    ''' Use the presence absence CSV file to obtain the average size
+    of each gene cluster, add that information to the summary stats
+    file to be able to see if the difference are caused by very short genes'''
+    print("Getting average gene sizes....")
+    out = open("roary_summary_file.csv", "w")
+    functions_out = open("functions_summary_file.csv", "w")
+    out.write("cluster, variable, length, count\n")
+    functions_out.write("Cluster, Freq,  Class, Size, Functions\n")
     for d in input_dirs:
         print(d)
+        cluster_name = d.split("/")[-1].split("_")[0]
         curr_cluster = gene_freqs[d]
-        outputs = {}
-        for type in ["rare", "inter", "soft_core", "core"]:
-            outputs[type] = open(os.path.join(d, type + "_functions.txt"), "w")
+        cluster_count = {}
+        for v in ["core", "soft_core", "inter", "rare"]:
+            cluster_count[v] = {"small" : 0, "not_small": 0}
         with open(os.path.join(d, "gene_presence_absence.csv")) as f:
-            for line in f:
-                toks = line.strip().split(",")
-                if toks[0] == "\"Gene\"":
+            for toks in reader(f):
+                if toks[0] == "Gene":
                     continue
-                gene_name = toks[0].replace("\"","")
-                annotation = toks[2].replace("\"","")
+                gene_name = toks[0]
+                annotation = "\"" + toks[2] + "\""
+                avg_length = float(toks[13].replace("\"",""))/3
                 if curr_cluster[gene_name] < 0.15:
-                    outputs["rare"].write(annotation + "\n")
+                    check_size(cluster_count, "rare", avg_length, short_gene_cuttoff)
+                    functions_out.write(",".join(map(str, [cluster_name, curr_cluster[gene_name], "rare", avg_length, annotation])) + "\n")
                 elif curr_cluster[gene_name] < 0.95:
-                    outputs["inter"].write(annotation + "\n")
+                    check_size(cluster_count, "inter", avg_length, short_gene_cuttoff)
+                    functions_out.write(",".join(map(str, [cluster_name, curr_cluster[gene_name] , "inter", avg_length, annotation])) + "\n")
                 elif curr_cluster[gene_name] < 0.99:
-                    outputs["soft_core"].write(annotation + "\n")
+                    check_size(cluster_count, "soft_core", avg_length, short_gene_cuttoff)
+                    functions_out.write(",".join(map(str, [cluster_name, curr_cluster[gene_name] , "soft_core", avg_length, annotation])) + "\n")
                 else:
-                    outputs["core"].write(annotation + "\n")
-        for o in outputs:
-            outputs[o].close()
+                    check_size(cluster_count, "core", avg_length, short_gene_cuttoff)
+                    functions_out.write(",".join(map(str, [cluster_name, curr_cluster[gene_name] , "core", avg_length, annotation])) + "\n")
+        #print(cluster_count)
+        for v1 in ["core", "soft_core", "inter", "rare"]:
+            for v2 in ["small", "not_small"]:
+                out.write(",".join(map(str, [cluster_name, v1, v2, cluster_count[v1][v2]])) + "\n")
+    out.close()
+    functions_out.close()
     return
 
 
@@ -224,8 +243,8 @@ def run(args):
     input_dirs = get_input_dirs(args.input_dir)
     gene_freqs = classify_genes(input_dirs)
     get_gene_sequences(input_dirs, gene_freqs)
+    create_roary_summary(input_dirs, gene_freqs, args.short_gene_cuttoff)
     quit()
-    summarise_functional_annotations(input_dirs, gene_freqs)
     blast_rare_genes(input_dirs, args.makeblastdb, args.blastp, args.cpu, args.mcl, args.inflation, args.min_identities)
     summarise_outputs(input_dirs, args.min_identities)
     remove_temp_files(input_dirs, min_identities)
@@ -239,6 +258,9 @@ def get_options():
     parser.add_argument('--input_dir', required=False,
                         type=str, default =  ".",
                         help='path to input directory [%(default)s]')
+    parser.add_argument('--short_gene_cuttoff', required=False,
+                            type=int, default =  "100",
+                            help='Cuttoff for a gene to be considered short [%(default)s]')
     parser.add_argument('--blastp',
                         type=str, default = "/software/pubseq/bin/ncbi_blast+/blastp",
                         help='blastp executable [%(default)s]')

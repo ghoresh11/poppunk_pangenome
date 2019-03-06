@@ -61,15 +61,16 @@ runjob5 python extract_distances.py --distances ${output_file}/${output_file}.di
 ## it should take about 10 minutes to run!
 conda activate python27
 runjob5 python calc_cluster_dists.py --clusters_file ${output_file}/${output_file}_clusters.csv --dists_file ${output_file}/${output_file}.dists.out --metadata_file ${metadata_file}
-runjob10 python calc_cluster_dists.py --clusters_file ${output_file}/${output_file}_clusters.csv --dists_file ${output_file}/${output_file}.dists.out --metadata_file ${metadata_file} --out dists_analysis_all --min_cluster_size 1
+runjob10 -o all_sizes.o -e all_sizes.e  python calc_cluster_dists.py --clusters_file ${output_file}/${output_file}_clusters.csv --dists_file ${output_file}/${output_file}.dists.out --metadata_file ${metadata_file} --out dists_analysis_all --min_cluster_size 1
 
 
 ### run roary
 python run_roary.py
-## get the summary_statistics
-python get_summary_stats.py
 
 
 ### merge the rare genes by running blast again on them with a more linient threshold
 job_name=merge_rares
+bsub -J ${job_name} -R"select[mem>1000] rusage[mem=1000]" -M1000  -G team216 -o ${job_name}.o -e ${job_name}.e python extract_gene_sequences.py
+
+job_name=gene_extraction
 bsub -q parallel -J ${job_name} -R"select[mem>3000] rusage[mem=3000]" -M3000  -G team216 -o ${job_name}.o -e ${job_name}.e -n16 -R"span[hosts=1]" python extract_gene_sequences.py

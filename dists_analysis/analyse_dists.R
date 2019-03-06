@@ -20,8 +20,7 @@ ggplot(cluster_sizes, aes(x = ID ,y = cluster_sizes$Cumsum)) + geom_point(alpha 
 within_distances = read.table("all/within_cluster_dist.csv", sep = ",",
                            header = T, stringsAsFactors = F, comment.char = "")
 
-## because of an if statement in "calc_cluster_dists", it actually only took clusters
-## of size 2 or more and ignore clusters of size 1
+
 between_distances = read.table("all/between_cluster_dist.csv", sep = ",",
                                header = T, stringsAsFactors = F, comment.char = "")
 
@@ -36,25 +35,38 @@ chosen_between = rep("no",dim(between_distances)[1])
 chosen_between[which(between_distances$cluster1 %in% chosen & between_distances$cluster2 %in% chosen)] = "yes"
 between_distances = cbind(between_distances, chosen = chosen_between)
 
-### see the range of distance
-ggplot(within_distances, aes(x = Core, fill = chosen)) + geom_density(alpha = 0.7) +
-  theme_classic(base_size = 16) + scale_fill_manual(values = brewer.pal(n = 3,"Greys")[c(1,3)]) + 
+### see the range of distance as boxplots
+cols = brewer.pal(n = 3, "Greys")[c(2,3)]
+within_core = melt(within_distances[,c(1:4, 8)], id.vars = c("Cluster", "chosen"))
+ggviolin(within_core, "variable", "value", fill = "chosen", 
+         palette =cols, add = "boxplot", xlab = "", ylab = "Distance")
+within_acc =  melt(within_distances[,c(1, 5:8)], id.vars = c("Cluster", "chosen"))
+ggviolin(within_acc, "variable", "value", fill = "chosen", 
+         palette =cols, add = "boxplot", xlab = "", ylab = "Distance")
+### As density plots
+ggplot(within_distances, aes(x = Core_median, fill = chosen)) + geom_density(alpha = 0.6) +
+  theme_classic(base_size = 16) + scale_fill_manual(values = cols) + 
   scale_y_continuous(expand = c(0,0)) + ylab("Density") + xlab("Within cluster mean core distance")
-ggplot(within_distances, aes(x = Core_max, fill = chosen)) + geom_density(alpha = 0.5)
-ggplot(within_distances, aes(x = Acc_max,  fill = chosen)) + geom_density(alpha = 0.5)
-ggplot(within_distances, aes(x = Acc, fill = chosen)) + geom_density(alpha = 0.7) +
-  theme_classic(base_size = 16) + scale_fill_manual(values = brewer.pal(n = 3,"Greys")[c(1,3)]) + 
+ggplot(within_distances, aes(x = Acc_median, fill = chosen)) + geom_density(alpha = 0.6) +
+  theme_classic(base_size = 16) + scale_fill_manual(values = cols) + 
   scale_y_continuous(expand = c(0,0)) + ylab("Density") + xlab("Within cluster mean accessory distance")
 
 
-ggplot(between_distances, aes(x = core, fill = chosen)) + geom_density(alpha = 0.7) +
-  theme_classic(base_size = 16) + scale_fill_manual(values = brewer.pal(n = 3,"Greys")[c(1,3)]) + 
-  scale_y_continuous(expand = c(0,0)) + ylab("Density") + xlab("Between cluster mean core distance")
-ggplot(between_distances, aes(x = core_max, fill = chosen)) + geom_density(alpha = 0.5)
-ggplot(between_distances, aes(x = accessory, fill = chosen)) + geom_density(alpha = 0.7) +
-  theme_classic(base_size = 16) + scale_fill_manual(values = brewer.pal(n = 3,"Greys")[c(1,3)]) + 
-  scale_y_continuous(expand = c(0,0)) + ylab("Density") + xlab("Between cluster mean accessory distance")
-ggplot(between_distances, aes(x = accessory_max, fill = chosen)) + geom_density(alpha = 0.5)
+### As boxplots
+between_core = melt(between_distances[,c(1:5, 9)], id.vars = c("cluster1", "cluster2", "chosen"))
+ggviolin(between_core, "variable", "value", fill = "chosen", 
+         palette =cols, add = "boxplot", xlab = "", ylab = "Distance")
+between_acc =  melt(between_distances[,c(1,2, 6:9)], id.vars = c("cluster1", "cluster2", "chosen"))
+ggviolin(between_acc, "variable", "value", fill = "chosen", 
+         palette =cols, add = "boxplot", xlab = "", ylab = "Distance")
+
+# As density/histograms plots (copy paste from here or abov, but the density plots are NON misleading)
+ggplot(between_distances, aes(x = core, fill = chosen)) + geom_density(alpha = 0.6) +
+  theme_classic(base_size = 16) + scale_fill_manual(values =cols) + 
+  scale_y_continuous(expand = c(0,0)) + ylab("Density") + xlab("Between cluster median core distance")
+ggplot(between_distances, aes(x = accessory, fill = chosen)) + geom_density(alpha = 0.6) +
+  theme_classic(base_size = 16) + scale_fill_manual(values =cols) + 
+  scale_y_continuous(expand = c(0,0)) + ylab("Density") + xlab("Between cluster median accessory distance")
 
 ### get general values
 max(within_distances$Core_max)
@@ -62,140 +74,204 @@ max(within_distances$Acc_max)
 max(between_distances$core_max)
 max(between_distances$accessory_max)
 
-### what's the connection between the size of the cluster and the core
-## and accessory distances? There isn't a direct connection
-max(roary_outputs$core_max_dist)
-max(roary_outputs$acc_max_dist)
 
+## Does the size of the cluster affect the within core/acc distances?
+## I have this again below in a better form
 within_distances = cbind(within_distances, size = cluster_sizes$Size[match(within_distances$Cluster, cluster_sizes$Cluster)])
-ggplot(within_distances, aes(y = Core, x = size)) + geom_point(alpha = 0.4, size = 2) +
+ggplot(within_distances, aes(y = Core_median, x = size)) + geom_point(alpha = 0.4, size = 2) +
   theme_bw(base_size = 16) + xlab("Cluster size") + ylab("Within cluster core distance")
 
-ggplot(within_distances, aes(y = Acc, x = size)) + geom_point(alpha = 0.4, size = 2) +
+ggplot(within_distances, aes(y = Acc_median, x = size)) + geom_point(alpha = 0.4, size = 2) +
   theme_bw(base_size = 16) + xlab("Cluster size") + ylab("Within cluster accessory distance")
 
 
-#### see how the number of genes in each cluster compares to the 
-# 1. Size of the cluster
-# 2. Within cluster acc dist
-# 3. Within cluster core dist
+## It's too big and not important enough to check for the between cluster distances
+## (Does having a bigger cluster mean you're more different from all the rest? NO (if run this))
+# between_distances = cbind(between_distances, size1 = cluster_sizes$Size[match(between_distances$cluster1, cluster_sizes$Cluster)],
+#              size2 = cluster_sizes$Size[match(between_distances$cluster2, cluster_sizes$Cluster)])
+# ggplot(between_distances, aes(y = core_median, x = size1)) + geom_point(alpha = 0.4, size = 2) +
+#   theme_bw(base_size = 16) + xlab("Cluster size") + ylab("Between cluster core distance")
+# ggplot(between_distances, aes(y = core_median, x = size2)) + geom_point(alpha = 0.4, size = 2) +
+#   theme_bw(base_size = 16) + xlab("Cluster size") + ylab("Between cluster core distance")
 
+### Combining poppunk output with the roary outputs
 roary_outputs = read.table("roary_summary_file.csv", sep = ",", header = T, stringsAsFactors = F)
 ## add info to the roary outputs CSV
 sizes = cluster_sizes$Size[match(roary_outputs$cluster, cluster_sizes$Cluster)]
-core_dist = within_distances$Core[match(roary_outputs$cluster, within_distances$Cluster)]
+
+core_dist = within_distances$Core_median[match(roary_outputs$cluster, within_distances$Cluster)]
 core_max_dist = within_distances$Core_max[match(roary_outputs$cluster, within_distances$Cluster)]
-acc_dist = within_distances$Acc[match(roary_outputs$cluster, within_distances$Cluster)]
+acc_dist = within_distances$Acc_median[match(roary_outputs$cluster, within_distances$Cluster)]
 acc_max_dist = within_distances$Acc_max[match(roary_outputs$cluster, within_distances$Cluster)]
 roary_outputs = cbind(roary_outputs, sizes, core_dist, core_max_dist, acc_dist, acc_max_dist)
 
 
-roary_outputs.m = melt(id.vars  = "cluster", roary_outputs[,1:5])
-roary_outputs.m = cbind(roary_outputs.m,
-                        size = roary_outputs$sizes[match(roary_outputs.m$cluster, roary_outputs$cluster)])
+variable_order = c("rare", "inter", "soft_core", "core")
+variable_2_order = c("small", "not_small")
+cols = brewer.pal(n = 5, "Blues")[-1]
 
-roary_outputs.m$variable = factor(roary_outputs.m$variable, c("rare_genes","inter_genes",  "soft_core_genes", "core_genes"))
+roary_outputs = cbind(roary_outputs,
+                        size = roary_outputs$sizes[match(roary_outputs$cluster, roary_outputs$cluster)])
+
+
+
 labs = c("Rare", "Intermediate", "Soft core", "Core")
-roary_outputs.m$cluster = factor(roary_outputs.m$cluster, sort(as.numeric(unique(roary_outputs$cluster))))
+roary_outputs$cluster = factor(roary_outputs$cluster, sort(as.numeric(unique(roary_outputs$cluster))))
 
-ggplot(roary_outputs.m, aes(x = cluster, y = value, fill = variable)) + 
-  geom_bar(stat = "identity", color = "black") +
-  scale_fill_brewer(palette = "Blues") + theme_classic(base_size = 16) +
-  scale_y_continuous(expand = c(0,0)) + xlab("Cluster") +
-  ylab("Genes")
 
-roary_outputs.m$variable = factor(roary_outputs.m$variable, c("core_genes", "soft_core_genes", "inter_genes","rare_genes"))
-ggplot(roary_outputs.m, aes(x = variable, y = value, fill = variable))+ 
-  geom_violin(trim=FALSE) +
-  geom_boxplot(width=0.1) +
-  scale_fill_brewer(palette = "Blues", guide = F, direction = -1) +
+## boxplot
+roary_outputs$variable = factor(roary_outputs$variable, rev(variable_order))
+ggplot(roary_outputs, aes(x = variable, y = count, color = length, fill = variable))+ 
+  geom_boxplot(width=0.4) +
+  scale_color_manual(values = c("black", "#909090"), labels = c(">=100aa", "<100aa"), name = "Length") +
   theme_bw(base_size = 16) + ylab("Genes") + xlab("") + 
-  scale_x_discrete(labels = rev(labs))
+  scale_x_discrete(labels = rev(labs)) +
+  scale_fill_manual(values = rev(cols), guide = F)
+
+## Collapse the length column
+roary_output_collapsed = data.frame(stringsAsFactors = F)
+for (i in 1:39){
+  for (j in variable_order) {
+    lines = roary_outputs[which(roary_outputs$cluster == i & roary_outputs$variable == j),]
+    new_line = lines[1,]
+    new_line$count = sum(lines$count)
+    roary_output_collapsed = rbind(roary_output_collapsed, new_line)
+  }
+}
+roary_outputs = roary_output_collapsed
+
+## Barplot
+roary_outputs$variable = factor(roary_outputs$variable, variable_order)
+ggplot(roary_outputs, aes(x = cluster, y = count, fill = variable)) + 
+  geom_bar(stat = "identity", color = "black") + 
+  scale_fill_manual(values = cols, labels = labs) + theme_classic(base_size = 16) +
+  scale_y_continuous(expand = c(0,0)) + xlab("Cluster") + 
+  ylab("Genes") 
 
 
-median(roary_outputs$core_genes)
-sd(roary_outputs$core_genes)
-median(roary_outputs$soft_core_genes)
-sd(roary_outputs$soft_core_genes)
-median(roary_outputs$inter_genes)
-sd(roary_outputs$inter_genes)
 
-roary_outputs.m$variable = factor(roary_outputs.m$variable, c("rare_genes","inter_genes",  "soft_core_genes", "core_genes"))
-ggplot(roary_outputs.m, aes(y = value, x = size, fill = variable)) + geom_point(size = 3, pch=21, color = "black", alpha = 0.7) +
+## General values to keep track of
+median(roary_outputs$count[roary_outputs$variable == "core"])
+sd(roary_outputs$count[roary_outputs$variable == "core"])
+median(roary_outputs$count[roary_outputs$variable == "soft_core"])
+sd(roary_outputs$count[roary_outputs$variable == "soft_core"])
+median(roary_outputs$count[roary_outputs$variable == "inter"])
+sd(roary_outputs$count[roary_outputs$variable == "inter"])
+median(roary_outputs$count[roary_outputs$variable == "rare"])
+sd(roary_outputs$count[roary_outputs$variable == "rare"])
+
+
+
+## connection between cluster size and number of genes from each category
+roary_outputs$variable = factor(roary_outputs$variable, variable_order)
+ggplot(roary_outputs, aes(y = count, x = sizes, fill = variable)) + 
+  geom_point(size = 3, pch=21, color = "black", alpha = 0.7) +
   theme_bw(base_size = 16) + xlab("Cluster size") + ylab("Genes") +
-  scale_fill_brewer(palette = "Blues", guide = F)+ 
+  scale_fill_manual(values = cols, guide = F)
+
+zoom_in = roary_outputs[which(roary_outputs$sizes < 800),]
+ggplot(zoom_in, aes(y = count, x = sizes, fill = variable)) + 
+  geom_point(size = 3, pch=21, color = "black", alpha = 0.7) +
+  theme_bw(base_size = 16) + xlab("Cluster size") + ylab("Genes") +
+  scale_fill_manual(values = cols, guide = F)+ 
   geom_smooth(method='lm',formula= y~x, se = T, aes(color = variable)) +
-  scale_color_brewer(palette = "Blues", guide = F)
+  scale_color_manual(values = cols, guide = F)
+
+
 
 ## add distances
-roary_outputs.m = cbind(roary_outputs.m,
-                        acc_dist = roary_outputs$acc_dist[match(roary_outputs.m$cluster, roary_outputs$cluster)])
-ggplot(roary_outputs.m, aes(y = value, x = acc_dist, fill = variable)) + geom_point(size = 3, pch=21, color = "black", alpha = 0.7) +
+ggplot(roary_outputs, aes(y = count, x = acc_dist, fill = variable)) + 
+  geom_point(size = 3, pch=21, color = "black", alpha = 0.7) +
   theme_bw(base_size = 16) + xlab("Within cluster accessory distance") + ylab("Genes") +
-  scale_fill_brewer(palette = "Blues", guide = F) + 
-  geom_smooth(method='lm',formula= y~x, se = T, aes(color = variable)) +
-  scale_color_brewer(palette = "Blues", guide = F)
+  scale_fill_manual(values = cols, guide = F) 
 
-
-roary_outputs.m = cbind(roary_outputs.m,
-                        core_dist = roary_outputs$core_dist[match(roary_outputs.m$cluster, roary_outputs$cluster)])
-ggplot(roary_outputs.m, aes(y = value, x = core_dist, fill = variable)) + geom_point(size = 3, pch=21, color = "black", alpha = 0.7) +
+ggplot(roary_outputs, aes(y = count, x = core_dist, fill = variable)) + geom_point(size = 3, pch=21, color = "black", alpha = 0.7) +
   theme_bw(base_size = 16) + xlab("Within cluster core distance") + ylab("Genes") +
-  scale_fill_brewer(palette = "Blues", guide = F) + 
-  geom_smooth(method='lm',formula= y~x, se = T, aes(color = variable)) +
-  scale_color_brewer(palette = "Blues", guide = F)
+  scale_fill_manual(values = cols, guide = F) 
 
 
-
+### More length analysis
 ### look at the gene lengths within each type of gene (rare, core, soft_core ...)
-gene_lengths = read.table("Gene_lengths.csv", sep = ",", header = T,
+gene_lengths = read.table("functions_summary_file.csv", sep = ",", header = T,
                           stringsAsFactors = F)
-gene_lengths$Type = factor(gene_lengths$Type , rev(c("rare","inter","soft_core", "core")))
+gene_lengths$Class = factor(gene_lengths$Class , rev(variable_order))
 labs = c()
 for (type in rev(c("rare","inter",  "soft_core", "core"))){
-  labs = c(labs,paste(type,"\n(",length(which(gene_lengths$Type == type)), ")", sep = ""))
+  labs = c(labs,paste(type,"\n(",length(which(gene_lengths$Class == type)), ")", sep = ""))
 }
-ggplot(gene_lengths, aes(x = Type, y = Length, fill = Type)) +
+ggplot(gene_lengths, aes(x = Class, y = Size, fill = Class)) +
   geom_violin(trim=FALSE) +
   geom_boxplot(width=0.1) +
-  scale_fill_brewer(palette = "Blues", guide = F, direction = -1) +
+  scale_fill_manual(values = rev(cols), guide = F) +
   theme_bw(base_size = 16) + ylab("Gene length (aa)") + xlab("") + 
   scale_x_discrete(labels = labs)
 
-median(gene_lengths$Length[which(gene_lengths$Type == "core")])
-median(gene_lengths$Length[which(gene_lengths$Type == "soft_core")])
-median(gene_lengths$Length[which(gene_lengths$Type == "inter")])
-median(gene_lengths$Length[which(gene_lengths$Type == "rare")])
 
 ## stratify by cluster
 gene_lengths$Cluster = factor(gene_lengths$Cluster, 1:39)
-core_lengths = gene_lengths[which(gene_lengths$Type == "core"),]
-ggplot(core_lengths, aes(x = Cluster, y = Length)) + geom_boxplot()
-soft_core_lengths = gene_lengths[which(gene_lengths$Type == "soft_core"),]
-ggplot(soft_core_lengths, aes(x = Cluster, y = Length)) + geom_boxplot()
-inter = gene_lengths[which(gene_lengths$Type == "inter"),]
-ggplot(inter, aes(x = Cluster, y = Length)) + geom_boxplot()
-rare = gene_lengths[which(gene_lengths$Type == "rare"),]
-ggplot(rare, aes(x = Cluster, y = Length)) + geom_boxplot()
-
+for (v in variable_order){
+  print(median(gene_lengths$Size[which(gene_lengths$Class == v)]))
+  lengths = gene_lengths[which(gene_lengths$Class == v),]
+  p = ggplot(lengths, aes(x = Cluster, y = Size)) + geom_boxplot() +
+    ggtitle(v) + ylab("Length (aa)")
+  print(p)
+}
 
 
 ## zoom in 
-gene_lengths = gene_lengths[-which(gene_lengths$Length > 500), ]
+gene_lengths = gene_lengths[-which(gene_lengths$Size > 500), ]
 labs = c()
 for (type in rev(c("rare","inter",  "soft_core", "core"))){
-  labs = c(labs,paste(type,"\n(",length(which(gene_lengths$Type == type)), ")", sep = ""))
+  labs = c(labs,paste(type,"\n(",length(which(gene_lengths$Class == type)), ")", sep = ""))
 }
-ggplot(gene_lengths, aes(x = Type, y = Length, fill = Type)) +
+ggplot(gene_lengths, aes(x = Class, y = Size, fill = Class)) +
   geom_violin(trim=FALSE) +
   geom_boxplot(width=0.1) +
-  scale_fill_brewer(palette = "Blues", guide = F, direction = -1) +
+  scale_fill_manual(values = rev(cols), guide = F) +
   theme_bw(base_size = 16) + ylab("Gene length (aa)") + xlab("") + 
   scale_x_discrete(labels = labs)
 
-ggplot(gene_lengths, aes(x = Length, fill = Type)) + geom_density(alpha = 0.6) +
-  scale_fill_brewer(palette = "Blues", guide = F, direction = -1)  +
-  theme_classic(base_size = 16) + xlab("Gene length (aa)") + ylab("Density")  
+### Piarwise distances between every two clusters
+pairwise_core_matrix = matrix(0, nrow = 39, ncol = 39)
+pairwise_acc_matrix = matrix(0, nrow = 39, ncol = 39)
+for (i in 1:38) {
+  for (j in (i+1):39) {
+    index = which((between_distances$cluster1 == i & between_distances$cluster2 == j) |
+             (between_distances$cluster1 == j & between_distances$cluster2 == i))
+    pairwise_core_matrix[i,j] = between_distances$core_median[index]
+    pairwise_core_matrix[j,i] = between_distances$core_median[index]
+    pairwise_acc_matrix[i,j] = between_distances$accessory_median[index]
+    pairwise_acc_matrix[j,i] = between_distances$accessory_median[index]
+  }
+}
 
 
+get_lower_tri<-function(m){
+  m[upper.tri(m)] <- NA
+  return(m)
+}
 
+reorder_matrix <- function(m){
+  hc <- hclust(dist(m))
+  m <-m[hc$order, hc$order]
+  return(m)
+}
+
+plot_matrix <- function(m, legend, names){
+  colnames(m) = names
+  rownames(m) = names
+  m <- reorder_matrix(m)
+  lower_tri = get_lower_tri(m)
+  melted_m <- melt(lower_tri, na.rm = TRUE)
+  melted_m$Var1 = factor(melted_m$Var1, melted_m$Var1[1:length(unique(melted_m$Var1))])
+  melted_m$Var2 = factor(melted_m$Var2, melted_m$Var1[1:length(unique(melted_m$Var1))])
+  p = ggplot(data = melted_m, aes(Var2, Var1, fill = value)) +
+    geom_tile(color = "black")+
+    scale_fill_gradient( high = "white", low = "blue", space = "Lab", name = legend) +
+    theme_bw(base_size = 16)+
+    coord_fixed() + xlab("Cluster") + ylab("Cluster") + theme(axis.text.x = element_text(angle = 90, vjust = 1))
+  return (p)
+}                                            
+
+plot_matrix(pairwise_core_matrix, "Core", 1:39)
+plot_matrix(pairwise_acc_matrix, "Accessory", 1:39)

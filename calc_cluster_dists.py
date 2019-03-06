@@ -163,10 +163,13 @@ def get_dist_within_cluster(clusters, cluster_sizes, dists_file, out, min_cluste
     Output: a file summarising all the within-cluster distances with metadata'''
     print("Calculating within-cluster distances...")
 
-    md_out = open(os.path.join(out, "metadata_within_cluster.csv"), "w")
+    md_out = {}
     metadata_vals = metadata.values()[0].keys()
     header = ['{}_{}'.format(a, b) for b in ["1","2"] for a in metadata_vals]
-    md_out.write("Member_1, Member_2, Cluster, Core_dist, Acc_dist, " + ",".join(header) + "\n")
+    for cluster in cluster_sizes:
+        if cluster_sizes[cluster] >= min_cluster_size:
+            md_out[cluster] =  open(os.path.join(out, str(cluster) + "_metadata_within_cluster.csv"), "w")
+            md_out[cluster].write("Core_dist, Acc_dist, " + ",".join(header) + "\n")
     within_cluster_dist = {}
     gffs = {}
     cnt = 0
@@ -186,16 +189,17 @@ def get_dist_within_cluster(clusters, cluster_sizes, dists_file, out, min_cluste
             gffs[cluster].add(fa_to_gff[toks[0]])
             gffs[cluster].add(fa_to_gff[toks[1]])
 
-            md_out.write(",".join([toks[0], toks[1], cluster, toks[2], toks[3]]))
+            md_out[cluster].write(",".join([toks[2], toks[3]]))
             for j in [0,1]: ## get all the metadata values for toks[0] and toks[1]
                 for v in metadata_vals:
-                    md_out.write("," + str(metadata[toks[j]][v]))
-            md_out.write("\n")
+                    md_out[cluster].write("," + str(metadata[toks[j]][v]))
+            md_out[cluster].write("\n")
 
             # if cnt == 10000: ## if testing uncomment here
             #     break
             # cnt += 1
-    md_out.close()
+    for cluster in md_out:
+        md_out[cluster].close()
     ## calc the averages
     ## generate output so that this doesn't need to be repeated
     with open(os.path.join(out, "within_cluster_dist.csv"),"w") as f_out:
@@ -285,7 +289,7 @@ def between_cluster_dist(clusters, cluster_sizes, min_cluster_size, dists_file, 
                 acc_max = max(between_cluster_dist[c1][c2]["accessory"])
                 acc_mean = mean(between_cluster_dist[c1][c2]["accessory"])
                 acc_median = median(between_cluster_dist[c1][c2]["accessory"])
-                f_out.write(",".join(map(str, [c1, c2, core_mean, core_max, core_median, cc_mean, acc_max, acc_median])) + "\n")
+                f_out.write(",".join(map(str, [c1, c2, core_mean, core_max, core_median, acc_mean, acc_max, acc_median])) + "\n")
     return
 
 
@@ -297,6 +301,7 @@ def run(args):
     all_metadata = metadata_per_cluster(args.metadata_file, cluster_sizes, clusters, args.min_cluster_size, args.out)
     within_cluster_dist = get_dist_within_cluster(clusters, cluster_sizes,
     args.dists_file, args.out, args.min_cluster_size, fa_to_gff, all_metadata)
+    quit()
     between_cluster_dist(clusters, cluster_sizes, args.min_cluster_size,  args.dists_file, fa_to_gff, args.out, all_metadata)
     return
 

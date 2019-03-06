@@ -11,7 +11,10 @@ clusters/
 chosen_K_11/
 dists_analysis/
 functions/
-*.DS_Store
+**.DS_Store
+**.Rhistory
+
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

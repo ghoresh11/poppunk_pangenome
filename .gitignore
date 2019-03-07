@@ -14,7 +14,8 @@ functions/
 **.DS_Store
 **.Rhistory
 
-
+## the virulenceFinder,RESfinder and PHASTER databases
+DBs/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

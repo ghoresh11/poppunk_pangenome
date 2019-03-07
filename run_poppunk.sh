@@ -74,3 +74,7 @@ bsub -J ${job_name} -R"select[mem>1000] rusage[mem=1000]" -M1000  -G team216 -o 
 
 job_name=gene_extraction
 bsub -q parallel -J ${job_name} -R"select[mem>3000] rusage[mem=3000]" -M3000  -G team216 -o ${job_name}.o -e ${job_name}.e -n16 -R"span[hosts=1]" python extract_gene_sequences.py
+
+## after extracting genes, blast them against Phage, Virulence and AMR
+job_name=blast_dbs
+bsub -q parallel -J ${job_name} -R"select[mem>5000] rusage[mem=5000]" -M5000  -G team216 -o ${job_name}.o -e ${job_name}.e -n8 -R"span[hosts=1]" python blast_against_DBs.py

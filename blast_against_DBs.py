@@ -2,7 +2,6 @@ import argparse
 import os
 import subprocess
 
-### TODO: MERGE THIS FILE WITH THE GENE EXTRACTION FILE
 
 def build_blast_dbs(args):
     ''' create a blast DB for the DB files
@@ -12,7 +11,9 @@ def build_blast_dbs(args):
     dbs = {"phasta_bact" : "bacteria_all_select_060319.db",
     "virulence": "clean_pathotype_genes.db",
     "phasta_prophage": "prophage_virus_060319.db",
-    "resfinder" : "resfinder_cleaned_060319.db"}
+    "resfinder" : "resfinder_cleaned_060319.db",
+    "card": "card_ariba_cleaned_080319.fa",
+    "arg-annot": "srst_ARGannot_r2_080319_cleaned.fasta"}
     #dbs = {"resfinder" : "resfinder_cleaned_060319.db"}
     for db in dbs:
         makeblastdb_command = map(
@@ -21,7 +22,7 @@ def build_blast_dbs(args):
         dbs[db] = os.path.join(db_dir, dbs[db])
     return dbs
 
-def get_input_dirs(input_dir):
+def get_input_dirs(input_dir, cluster):
     ''' check all directories in the input dir
     return a list of directories that have all the required files'''
     print("Getting the input directories...")
@@ -31,8 +32,8 @@ def get_input_dirs(input_dir):
     for d in directories:
         if os.path.isfile(os.path.join(d, "pan_genome_reference.fa")) and os.path.isfile(os.path.join(d, "gene_presence_absence.csv")) and os.path.isfile(os.path.join(d, "gene_presence_absence.Rtab")):
         #    for debugging, uncomment:
-            # if d.split("/")[-1].split("_")[0] != "39":
-            #     continue
+            if d.split("/")[-1].split("_")[0] != cluster:
+                continue
             dirs_to_return.append(d)
     return dirs_to_return
 
@@ -105,7 +106,7 @@ def summarise_blast_outputs(dirs, dbs, num_genes, args):
     etc
     '''
     print("Summarising the BLAST outputs...")
-    out = open("gene_DB_hits.csv", "w")
+    out = open(args.cluster + "_gene_DB_hits.csv", "w")
     out.write("Cluster, Gene_class, DB, Count, Proportion\n")
     for d in dirs:
         curr_cluster = d.split("/")[-1].split("_")[0]
@@ -120,7 +121,7 @@ def summarise_blast_outputs(dirs, dbs, num_genes, args):
 
 def run(args):
     dbs = build_blast_dbs(args)
-    dirs = get_input_dirs(args.input_dir)
+    dirs = get_input_dirs(args.input_dir, args.cluster)
     blast_all_clusters(dirs, dbs, args)
     num_genes = count_num_genes(dirs)
     summarise_blast_outputs(dirs, dbs, num_genes, args)
@@ -142,6 +143,8 @@ def get_options():
         '--blastp', type=str, help='blastn executable [%(default)s]', default="/software/pubseq/bin/ncbi_blast+/blastp", metavar='STR')
     parser.add_argument(
         '--c', help='cpus to use when running blast', default=8, type=int)
+    parser.add_argument(
+        '--cluster', help='Which cluster to run this run on (1-39)', default="39", type=str)
     parser.add_argument('--input_dir', required=False, type=str, default =  ".", help='path to input directory [%(default)s]')
     return parser.parse_args()
 

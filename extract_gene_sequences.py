@@ -32,7 +32,6 @@ def classify_genes(input_dirs):
     for d in input_dirs:
         print(d)
         gene_class[d] = {}
-        outputs = {}
         with open(os.path.join(d, "gene_presence_absence.Rtab")) as f:
             for line in f:
                 if line.startswith("Gene"):

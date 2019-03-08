@@ -13,6 +13,7 @@ dists_analysis/
 functions/
 **.DS_Store
 **.Rhistory
+plots/
 
 ## the virulenceFinder,RESfinder and PHASTER databases
 DBs/

@@ -55,24 +55,28 @@ def get_clusters(clusters_file, fa_to_reads):
     return clusters
 
 
-def get_read_files(metadata_file, clusters):
-    ''' add two read files to the assembly dict
-    assembly -> cluster, read1, read2'''
-    return
+def get_failed():
+    ''' read the list of files that failed to run ARIBA
+    on them again'''
+    failed = []
+    with open("failed.txt") as f:
+        for line in f:
+            failed.append(line.strip().replace(".o",""))
+    return failed
 
-
-def run_ariba(clusters, out_dir):
+def run_ariba(clusters, out_dir, failed):
     '''To run ariba:
     ## for every two files:
     ## It's probably best to create an ariba job for each cluster seperately on all
     ## genomes in that cluster
     ## Has to work with python3
     ariba run plasmidfinder_080319.prepareref reads1.fastq reads2.fastq out.run
-    At the end, create a summary of all the output tsv files:
-    ariba summary out.summary out.run1/report1.tsv out.run2/report2.tsv out.run3/report3.tsv --threads threads
     call a small ariba job 9000 times for all the genomes with very little memory and CPUs
     save the output file the name of the cluster + assembly so I run summary on all the
     ones that have the same prefix
+    At the end, create a summary of all the output tsv files:
+    ariba summary out.summary out.run1/report1.tsv out.run2/report2.tsv out.run3/report3.tsv --threads threads
+
     '''
     for item in clusters:
         # these have been long read sequenced, use a different method for them
@@ -83,9 +87,13 @@ def run_ariba(clusters, out_dir):
             out_dir, clusters[item]["cluster"] + "_" + item)
 
         job_name = clusters[item]["cluster"] + "_" + item
+
+        if failed is not None and job_name not in failed:
+            continue
+
         mem = "500"
         threads = "1"
-        lsf_prefix = ["bsub", "-J", job_name, "-G", "team216", "-o", job_name + ".o",
+        lsf_prefix = ["bsub", "-q", "normal", "-J", job_name, "-G", "team216", "-o", job_name + ".o",
                       "-e", job_name + ".e", '-R"select[mem>' + mem + '] rusage[mem=' + mem + '] span[hosts=1]"', '-M' + mem, "-n" + threads]
         command = ["ariba", "run", "plasmidfinder_080319.prepareref", clusters[item]
                    ["reads"][0], clusters[item]["reads"][1], out_path, "--threads", threads]
@@ -93,16 +101,22 @@ def run_ariba(clusters, out_dir):
     return
 
 
+def run_blast_long_reads():
+    ''' for the long read sequenced data, simply blast the assemblies
+    against the plasmid finder reference (that's the best I can think of..)'''
+    return
+
 def run(args):
     fa_to_reads = assemblies_to_reads(args.metadata_file)
     clusters = get_clusters(args.clusters_file, fa_to_reads)
-    run_ariba(clusters, args.out_dir)
+    failed = get_failed()
+    run_ariba(clusters, args.out_dir, failed)
     return
 
 
 def get_options():
     parser = argparse.ArgumentParser(
-        description='Extract the gene sequences from roary outputs, and merge rare genes')
+        description='Run ARIBA on all the read files')
     # input options
     parser.add_argument('--metadata_file', required=False,
                         type=str, default="/lustre/scratch118/infgen/team216/gh11/e_coli_collections/FINAL_METADATA_CLEANED.csv",

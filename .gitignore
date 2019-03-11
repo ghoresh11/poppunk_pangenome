@@ -14,6 +14,7 @@ functions/
 **.DS_Store
 **.Rhistory
 plots/
+plasmid_summary_all.csv
 
 ## the virulenceFinder,RESfinder and PHASTER databases
 DBs/

@@ -18,6 +18,8 @@ plasmid_summary_all.csv
 2_dists_roary_analysis/*.csv
 2_dists_roary_analysis/*.cys
 
+4_vir_amr_phage/gene_DB_hits/
+
 
 ## the virulenceFinder,RESfinder and PHASTER databases
 DBs/

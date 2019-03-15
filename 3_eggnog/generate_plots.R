@@ -115,4 +115,47 @@ zoom = cogs[-which(cogs$size>1000),]
 ggplot(zoom, aes(x = size, y = count, fill = cog_cat)) + geom_point(size = 3, alpha = 0.7, pch = 21, color = "black") +
   scale_fill_manual(values = cols) + theme_bw(base_size = 16) 
 
-
+### check what the common word is in each category
+cats = unique(cogs$cog_cat)
+for (cat in cats){
+  minimum = mean(cogs$count[which(cogs$cog_cat == cat)]) - (sd(cogs$count[which(cogs$cog_cat == cat)])/2)
+  if (cat == "S"){ minimum = 100}
+  ### word counts
+  words = data.frame(stringsAsFactors = F)
+  for (type in variable_order) {
+    curr = read.table(paste(type, "_words.csv",sep=""), sep = ",", header = T,
+                      stringsAsFactors = F)
+    curr = cbind(curr, class = rep(type, dim(curr)[1]))
+    curr = curr[which(curr$COG_Cat == cat),]
+    if (dim(curr)[1] > 1) { 
+      curr = curr[which(curr$Count>minimum),]
+      if (dim(curr)[1] > 1) {
+        words = rbind(words, curr)
+      }
+    } 
+  }
+  if (dim(words)[1] == 0) {next}
+  
+  for (type in variable_order){
+    for (i in 1:dim(words)[1]){
+      w = words$Word[i]
+      line = which(words$Word == w & words$class == type)
+      if (length(line) == 0){
+        words = rbind(words, data.frame(COG_Cat = cat, 
+                                        Word = words$Word[i],
+                                        Label = words$Label[i], 
+                                        Count = 0, 
+                                        class = type))
+      }
+    }
+  }
+  words$Count = as.numeric(words$Count)
+  words$class = factor(words$class, variable_order)
+  words$Label = factor(words$Label, unique(words$Label[order(words$Count, decreasing = F)]))
+  desc = descs$V2[which(descs$V1 == cat)]
+  p = ggplot(words, aes(x = Label, y = Count, fill = class)) + geom_bar(stat = "identity", position = "dodge") +
+    coord_flip() + scale_fill_manual(values = gene_type_cols) + theme_classic(base_size = 16) + ggtitle(paste(cat,desc, sep = ": "))
+  lines = length(unique(words$Label))
+  ggsave(p, filename = paste("plots/",cat,".pdf", sep = ""), width = 10, height = min(lines * 2, 13))
+  
+}

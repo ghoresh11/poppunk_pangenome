@@ -166,7 +166,7 @@ def run_roary(args, out_dir, gene_classes):
         subprocess.call(lsf_prefix + command)
 
         ## job_name=rare
-        ## bsub -q parallel -J ${job_name} -G team216 -o ${job_name}.o -e ${job_name}.e -R"select[mem>10000]  rusage[mem=10000] span[hosts=1]" -M 10000 -n 16 roary -p 16 -e -mafft -b /software/pubseq/bin/ncbi_blast+/blastp -m /software/pubseq/bin/ncbi_blast+/makeblastdb -s *.gff
+        ## bsub -q parallel -J ${job_name} -G team216 -o ${job_name}.o -e ${job_name}.e -R"select[mem>50000]  rusage[mem=50000] span[hosts=1]" -M 50000 -n 16 roary -p 16 -e -mafft -b /software/pubseq/bin/ncbi_blast+/blastp -m /software/pubseq/bin/ncbi_blast+/makeblastdb -s *.gff
     return
 
 

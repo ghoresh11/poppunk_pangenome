@@ -20,11 +20,14 @@ plasmid_summary_all.csv
 
 4_vir_amr_phage/gene_DB_hits/
 3_eggnog/eggnog/
+3_eggnog/*.csv
 5_roary_on_class/rare
 5_roary_on_class/soft_core
 5_roary_on_class/core
 5_roary_on_class/inter
 5_roary_on_class/gff_jobs/
+
+
 
 ## the virulenceFinder,RESfinder and PHASTER databases
 DBs/

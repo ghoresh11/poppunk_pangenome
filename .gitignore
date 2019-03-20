@@ -27,6 +27,10 @@ plasmid_summary_all.csv
 5_roary_on_class/inter
 5_roary_on_class/gff_jobs/
 
+6_pairwise_roary/nodes.txt
+6_pairwise_roary/edges.txt
+6_pairwise_roary/networks.cys
+6_pairwise_roary/complete_presence_absence.csv
 
 
 ## the virulenceFinder,RESfinder and PHASTER databases

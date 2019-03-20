@@ -2,7 +2,7 @@ library(ggplot2)
 library(RColorBrewer)
 library(reshape2)
 
-setwd("/Users/gh11/poppunk_pangenome/dists_analysis/")
+setwd("/Users/gh11/poppunk_pangenome/2_dists_roary_analysis//")
 
 
 cluster_sizes = read.table("cluster_sizes.csv", sep = ",",
@@ -11,6 +11,11 @@ cluster_sizes = read.table("cluster_sizes.csv", sep = ",",
 ## draw a point plot with the cluster sizes
 cluster_sizes = cluster_sizes[order(cluster_sizes$Size, decreasing = T),]
 cluster_sizes = cbind(ID = 1:dim(cluster_sizes)[1], cluster_sizes, Cumsum = cumsum(cluster_sizes$Size))
+
+temp = cluster_sizes[which(cluster_sizes$Size>=30),]
+temp$Cluster = factor(temp$Cluster, seq(39,1,-1))
+ggplot(temp, aes(x = Cluster, y = Size)) + geom_bar(stat = "identity") +
+  theme_classic(base_size = 16) + coord_flip() + ylab("Number of genomes")
 
 ggplot(cluster_sizes, aes(x = ID ,y = cluster_sizes$Cumsum)) + geom_point(alpha = 0.5, size = 3) +
   xlab("poppunk cluster") + ylab("Total number of genomes") + geom_vline(xintercept=39, col = "red") +

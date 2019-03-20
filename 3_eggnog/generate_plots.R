@@ -55,6 +55,32 @@ for (gene_class in variable_order){
   print(p)
 }
 
+## check if there are differences between the clusters
+for (c in unique(cogs$cog_cat)) {
+  curr = cogs[which(cogs$cog_cat == c),]
+  ## add missing values to dataframe
+  for (gene_class in variable_order){
+    for (cluster in 1:39){
+      index = which(curr$gene_type == gene_class & curr$cluster == cluster)
+      if (length(index) == 0){
+        curr = rbind(curr, data.frame(
+          cluster = cluster,
+          gene_type = gene_class,
+          cog_cat = c,
+          count = 0,
+          size = 0, stringsAsFactors = F
+        ))
+      }
+    }
+  }
+  curr$cluster = factor(curr$cluster, 1:39)
+  curr$gene_type = factor(curr$gene_type, variable_order)
+  p = ggplot(curr, aes(x = cluster, y = count, fill = gene_type)) + geom_bar(stat = "identity", position = "dodge") +
+    scale_fill_manual(values = gene_type_cols) + theme_classic(base_size = 16) + ggtitle(c)
+  print(p)
+}
+
+
 figures_out = "/Users/gh11/Submissions/ecoli_mobilome/figures/functions/per_cog_category/"
 ## Look at how each COG category changes in count across all clusters
 for (c in unique(cogs$cog_cat)){

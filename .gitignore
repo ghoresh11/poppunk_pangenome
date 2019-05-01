@@ -17,6 +17,7 @@ plasmid_summary_all.csv
 2_dists_roary_analysis/all/*
 2_dists_roary_analysis/*.csv
 2_dists_roary_analysis/*.cys
+2_dists_roary_analysis/gene_presence_absences/
 
 4_vir_amr_phage/gene_DB_hits/
 3_eggnog/eggnog/
@@ -30,7 +31,7 @@ plasmid_summary_all.csv
 6_pairwise_roary/nodes.txt
 6_pairwise_roary/edges.txt
 6_pairwise_roary/networks.cys
-6_pairwise_roary/complete_presence_absence.csv
+6_pairwise_roary/*.csv
 
 
 ## the virulenceFinder,RESfinder and PHASTER databases

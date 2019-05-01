@@ -2,11 +2,11 @@ library(ggplot2)
 library(RColorBrewer)
 
 
-#setwd("/Users/gh11/poppunk_pangenome/dists_analysis/")
+setwd("/Users/gh11/poppunk_pangenome/dists_analysis/")
 
-# metadata = read.table("metadata_per_cluster.csv", sep = "\t",
-#                       header = T, stringsAsFactors = F, comment.char = "")
-# 
+metadata = read.table("metadata_per_cluster.csv", sep = "\t",
+                      header = T, stringsAsFactors = F, comment.char = "")
+
 # 
 # clusters = unique(metadata$cluster)
 # 
@@ -51,24 +51,23 @@ library(RColorBrewer)
 # ggplot(Continent, aes( x = cluster, y = count, fill = value)) + geom_bar(stat = "identity", color = "black") +
 #   theme_bw(base_size = 16) + scale_fill_manual(values = cols)+
 #   xlab("Cluster") + ylab("% of isolates")
-# 
-# Isolation = metadata[which(metadata$variable == "Isolation"),]
-# Isolation$cluster = factor(Isolation$cluster, 1:39)
-# Isolation$value = factor(Isolation$value, c("feces","urine","blood","other/unknown"))
-# cols = c( "#731d1d","#ffff66","#ff7f7f","#dddddd")
-# ggplot(Isolation, aes( x = cluster, y = count, fill = value)) + 
-#   geom_bar(stat = "identity", color = "black") +
-#   theme_bw(base_size = 16) + scale_fill_manual(values = cols)+
-#   xlab("Cluster") + ylab("% of isolates")
-# 
-# Publication = metadata[which(metadata$variable == "Publication"),]
-# Publication$cluster = factor(Publication$cluster, 1:39)
-# cols = c(brewer.pal(n=8, "Dark2"), brewer.pal(n = 8, "Set3"), brewer.pal(n = 8, "Set1"))
-# ggplot(Publication, aes( x = cluster, y = count, fill = value)) + 
-#   geom_bar(stat = "identity", color = "black") + scale_fill_manual(values = cols)+
-#   theme_bw(base_size = 16) + 
-#   xlab("Cluster") + ylab("% of isolates")
-# 
+
+Isolation = metadata[which(metadata$variable == "Isolation"),]
+Isolation$cluster = factor(Isolation$cluster, seq(39,1,-1))
+Isolation$value = factor(Isolation$value, rev(c("feces","blood","urine","other/unknown")))
+cols =rev( c(brewer.pal(n = 3, "Set2"),"#dddddd"))
+ggplot(Isolation, aes( x = cluster, y = count, fill = value)) +
+  geom_bar(stat = "identity", color = "black") + scale_fill_manual(values = cols, name = "Isolation")+
+  xlab("Group") + ylab("% of isolates") + coord_flip() + theme_minimal(base_size = 16)
+
+Publication = metadata[which(metadata$variable == "Publication"),]
+Publication$cluster = factor(Publication$cluster, 1:39)
+cols = c(brewer.pal(n=8, "Dark2"), brewer.pal(n = 8, "Set3"), brewer.pal(n = 8, "Set1"))
+ggplot(Publication, aes( x = cluster, y = count, fill = value)) +
+  geom_bar(stat = "identity", color = "black") + scale_fill_manual(values = cols)+
+  theme_bw(base_size = 16) +
+  xlab("Group") + ylab("% of isolates")
+
 # 
 # Year = metadata[which(metadata$variable == "Year" & metadata$value != "nd"),]
 # Year$cluster = factor(Year$cluster, 1:39)

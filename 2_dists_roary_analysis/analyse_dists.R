@@ -13,9 +13,10 @@ cluster_sizes = cluster_sizes[order(cluster_sizes$Size, decreasing = T),]
 cluster_sizes = cbind(ID = 1:dim(cluster_sizes)[1], cluster_sizes, Cumsum = cumsum(cluster_sizes$Size))
 
 temp = cluster_sizes[which(cluster_sizes$Size>=30),]
-temp$Cluster = factor(temp$Cluster, seq(39,1,-1))
+temp$Cluster = factor(temp$Cluster, 1:39)
 ggplot(temp, aes(x = Cluster, y = Size)) + geom_bar(stat = "identity") +
-  theme_classic(base_size = 16) + coord_flip() + ylab("Number of genomes")
+  theme_classic(base_size = 18)  +ylab("Genomes") + xlab("Group")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
 ggplot(cluster_sizes, aes(x = ID ,y = cluster_sizes$Cumsum)) + geom_point(alpha = 0.5, size = 3) +
   xlab("poppunk cluster") + ylab("Total number of genomes") + geom_vline(xintercept=39, col = "red") +
@@ -120,8 +121,9 @@ roary_outputs = cbind(roary_outputs,
 
 
 
-labs = c("Rare", "Intermediate", "Soft core", "Core")
+labs = c("Rare (present in less than <15% of isolates)", "Intermediate (present in 15% to 95%)", "Soft core (present in 95% to 99%)", "Core (present in >99% of isolates)")
 roary_outputs$cluster = factor(roary_outputs$cluster, sort(as.numeric(unique(roary_outputs$cluster))))
+
 
 
 ## boxplot
@@ -172,7 +174,7 @@ roary_outputs$variable = factor(roary_outputs$variable, variable_order)
 ggplot(roary_outputs, aes(y = count, x = sizes, fill = variable)) + 
   geom_point(size = 3, pch=21, color = "black", alpha = 0.7) +
   theme_bw(base_size = 16) + xlab("Cluster size") + ylab("Genes") +
-  scale_fill_manual(values = cols, guide = F)
+  scale_fill_manual(values = cols, labels = labs)
 
 zoom_in = roary_outputs[which(roary_outputs$sizes < 800),]
 ggplot(zoom_in, aes(y = count, x = sizes, fill = variable)) + 
@@ -195,46 +197,7 @@ ggplot(roary_outputs, aes(y = count, x = core_dist, fill = variable)) + geom_poi
   scale_fill_manual(values = cols, guide = F) 
 
 
-### More length analysis
-### look at the gene lengths within each type of gene (rare, core, soft_core ...)
-gene_lengths = read.table("functions_summary_file.csv", sep = ",", header = T,
-                          stringsAsFactors = F)
-gene_lengths$Class = factor(gene_lengths$Class , rev(variable_order))
-labs = c()
-for (type in rev(c("rare","inter",  "soft_core", "core"))){
-  labs = c(labs,paste(type,"\n(",length(which(gene_lengths$Class == type)), ")", sep = ""))
-}
-ggplot(gene_lengths, aes(x = Class, y = Size, fill = Class)) +
-  geom_violin(trim=FALSE) +
-  geom_boxplot(width=0.1) +
-  scale_fill_manual(values = rev(cols), guide = F) +
-  theme_bw(base_size = 16) + ylab("Gene length (aa)") + xlab("") + 
-  scale_x_discrete(labels = labs)
 
-
-## stratify by cluster
-gene_lengths$Cluster = factor(gene_lengths$Cluster, 1:39)
-for (v in variable_order){
-  print(median(gene_lengths$Size[which(gene_lengths$Class == v)]))
-  lengths = gene_lengths[which(gene_lengths$Class == v),]
-  p = ggplot(lengths, aes(x = Cluster, y = Size)) + geom_boxplot() +
-    ggtitle(v) + ylab("Length (aa)")
-  print(p)
-}
-
-
-## zoom in 
-gene_lengths = gene_lengths[-which(gene_lengths$Size > 500), ]
-labs = c()
-for (type in rev(c("rare","inter",  "soft_core", "core"))){
-  labs = c(labs,paste(type,"\n(",length(which(gene_lengths$Class == type)), ")", sep = ""))
-}
-ggplot(gene_lengths, aes(x = Class, y = Size, fill = Class)) +
-  geom_violin(trim=FALSE) +
-  geom_boxplot(width=0.1) +
-  scale_fill_manual(values = rev(cols), guide = F) +
-  theme_bw(base_size = 16) + ylab("Gene length (aa)") + xlab("") + 
-  scale_x_discrete(labels = labs)
 
 ### Piarwise distances between every two clusters
 pairwise_core_matrix = matrix(0, nrow = 39, ncol = 39)
@@ -267,6 +230,7 @@ plot_matrix <- function(m, legend, names){
   rownames(m) = names
   m <- reorder_matrix(m)
   lower_tri = get_lower_tri(m)
+#  lower_tri[which(lower_tri == 0)] = NA
   melted_m <- melt(lower_tri, na.rm = TRUE)
   melted_m$Var1 = factor(melted_m$Var1, melted_m$Var1[1:length(unique(melted_m$Var1))])
   melted_m$Var2 = factor(melted_m$Var2, melted_m$Var1[1:length(unique(melted_m$Var1))])
@@ -280,3 +244,5 @@ plot_matrix <- function(m, legend, names){
 
 plot_matrix(pairwise_core_matrix, "Core", 1:39)
 plot_matrix(pairwise_acc_matrix, "Accessory", 1:39)
+
+plot(between_distances$core_median[chosen], between_distances$accessory_median[chosen])

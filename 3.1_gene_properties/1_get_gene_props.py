@@ -31,6 +31,7 @@ def get_genomes_to_gene_clusters(args):
     ''' read the clustered proteins output.
     Return a dictionary of genome -> name_of_gene_in_genome -> name of geneCluster
     '''
+    print("Reading clustered proteins file...")
     input_dir = get_roary_dir(args)
     genomes_gene_cluster = {}
     with open(os.path.join(input_dir, "clustered_proteins")) as f:
@@ -42,6 +43,7 @@ def get_genomes_to_gene_clusters(args):
                 if genome not in genomes_gene_cluster:
                     genomes_gene_cluster[genome] = {}
                 genomes_gene_cluster[genome][gene] = gene_cluster
+
     return genomes_gene_cluster
 
 
@@ -75,8 +77,8 @@ def get_props_for_one_genome(args, properties, genome_name, gene_cluster, gene_r
             if gene_name not in gene_cluster:
                 ## some genes are not in the final roary output
                 continue
-            curr_cluster = gene_cluster[gene_name]
 
+            curr_cluster = gene_cluster[gene_name]
             if curr_cluster not in properties:
                 properties[curr_cluster] = {"class": "NA",
                                             "cog" : "NA",
@@ -84,6 +86,9 @@ def get_props_for_one_genome(args, properties, genome_name, gene_cluster, gene_r
                                             "contig_lengths":[],
                                             "positions": [],
                                             "protein_length": []}
+
+            if args.cluster == 1:
+                gene_name = curr_cluster    # special case because the output is different
 
             if gene_name in gene_reps:
                 properties[curr_cluster]["class"] = gene_reps[gene_name]["class"]
@@ -96,13 +101,14 @@ def get_props_for_one_genome(args, properties, genome_name, gene_cluster, gene_r
                 end = float(toks[4])
             else:
                 end = contig_length - float(toks[3]) ## minus strand
-            properties[curr_cluster]["positions"].append(end / contig_length)
+            properties[curr_cluster]["positions"].append(contig_length - end)
             properties[curr_cluster]["protein_length"].append((int(toks[4]) - int(toks[3]) + 1) / 3.0)
     return
 
 def read_eggnog(args):
     ''' get the class and COG from the eggnog outputs for each gene cluster
     return the reps class and COG category'''
+    print("Getting COG details...")
     all_files = os.listdir(args.eggnog_dir)
     files = {}
     for f in all_files:
@@ -125,34 +131,55 @@ def read_eggnog(args):
     return gene_reps
 
 
+def get_rep_class(args, gene_reps):
+    ''' get the class of all the genes using the outputs in the roary directories'''
+    print("Getting class details....")
+    input_dir = get_roary_dir(args)
+    for gene_class in ["rare", "inter", "soft_core", "core"]:
+        with open(os.path.join(input_dir, gene_class + "_genes.fa")) as handle:
+            for values in SimpleFastaParser(handle):
+                name = values[0].split()[0]
+                if name not in gene_reps.keys():
+                    gene_reps[name] = {}
+                    gene_reps[name]["class"] = "?"
+                    gene_reps[name]["cog"] = "?"
+
+
 def get_rep_GC_content(args, gene_reps):
     ''' get the GC content of the reprasentative sequence for each gene cluster
     update this in the gene_reps dictionary'''
+    print("Calculating GC content...")
     input_dir = get_roary_dir(args)
-    for gene_type in ["core", "soft_core", "inter", "rare"]:
-        print(gene_type)
-        cnt = 0
-        with open(os.path.join(input_dir, gene_type + "_genes.fa")) as handle:
-            for values in SimpleFastaParser(handle):
-                name = values[0].split()[0]
-                if name in gene_reps.keys():
-                    gene_reps[name]["GC"] = GC(values[1])
-                else:
-                    cnt += 1
-        print(cnt)
+    with open(os.path.join(input_dir, "pan_genome_reference.fa")) as handle:
+        for values in SimpleFastaParser(handle):
+            name = values[0].split()[0]
+            if name in gene_reps.keys():
+                gene_reps[name]["GC"] = GC(values[1])
+            else:
+                gene_reps[name] = {}
+                gene_reps[name]["GC"] = GC(values[1])
+                gene_reps[name]["class"] = "?"
+                gene_reps[name]["cog"] = "?"
     return
 
 
 
 def get_properties_for_all(args, genome_gene_cluster):
     ''' go over other outputs and GFF files to obtain the properties of all the genes '''
+
+    ### For COG category and GC content, I'm not using an average but using the rep
+    ## from the roary outputs. This is problematic with cluster 1 because I changed the
+    # output for that cluster.
     gene_reps = read_eggnog(args)
+    get_rep_class(args, gene_reps)
     get_rep_GC_content(args, gene_reps)
+
     properties = {}
+    print("Calculating properties per genome...")
     for genome in genome_gene_cluster:
         get_props_for_one_genome(args, properties, genome, genome_gene_cluster[genome], gene_reps)
 
-    ## TODO: add EGGNOG and CLASS to this file
+    print("Generating output...")
     with open(os.path.join(str(args.cluster) + "_gene_properties.csv"), "w") as out:
         out.write("gene, class, COG, cnt, GC,  mean_length, sd_length, mean_pos, sd_pos, mean_contig_length, sd_contig_length\n")
         for gene in properties:
@@ -168,6 +195,7 @@ def get_properties_for_all(args, genome_gene_cluster):
 def run(args):
     genomes_gene_cluster = get_genomes_to_gene_clusters(args)
     get_properties_for_all(args, genomes_gene_cluster)
+    print("DONE!")
     return
 
 

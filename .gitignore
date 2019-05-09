@@ -22,6 +22,7 @@ plasmid_summary_all.csv
 4_vir_amr_phage/gene_DB_hits/
 3_eggnog/eggnog/
 3_eggnog/*.csv
+3.1_gene_properties/figures/
 
 3.1_gene_properties/results/
 5_roary_on_class/rare

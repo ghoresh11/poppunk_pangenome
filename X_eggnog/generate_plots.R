@@ -36,7 +36,7 @@ cols = c(
 names(cols) = all
 
 
-### barplots of all rare, inter, core and soft-core genes
+### barplots of all rare, inter, core and soft-core genes in each cluster 
 ## for all the cluster seperately
 for (gene_class in variable_order){
   rare = cogs[which(cogs$gene_type == gene_class),]
@@ -45,7 +45,8 @@ for (gene_class in variable_order){
       rare = rbind(rare, data.frame(cluster = 1,
                                     gene_type = gene_class,
                                     cog_cat = c,
-                                    count = 0))
+                                    count = 0, 
+                                    size = 0))
     }
   }
   rare$cluster = factor(rare$cluster, 1:39)
@@ -55,48 +56,39 @@ for (gene_class in variable_order){
   print(p)
 }
 
-## check if there are differences between the clusters
-for (c in unique(cogs$cog_cat)) {
-  curr = cogs[which(cogs$cog_cat == c),]
-  ## add missing values to dataframe
-  for (gene_class in variable_order){
-    for (cluster in 1:39){
-      index = which(curr$gene_type == gene_class & curr$cluster == cluster)
-      if (length(index) == 0){
-        curr = rbind(curr, data.frame(
-          cluster = cluster,
-          gene_type = gene_class,
-          cog_cat = c,
-          count = 0,
-          size = 0, stringsAsFactors = F
-        ))
-      }
-    }
-  }
-  curr$cluster = factor(curr$cluster, 1:39)
-  curr$gene_type = factor(curr$gene_type, variable_order)
-  p = ggplot(curr, aes(x = cluster, y = count, fill = gene_type)) + geom_bar(stat = "identity", position = "dodge") +
-    scale_fill_manual(values = gene_type_cols) + theme_classic(base_size = 16) + ggtitle(c)
-  print(p)
-}
+### plot all the genes in all cluster with the COG cat -> omitting S/Unknown
+cogs$cluster = factor(cogs$cluster, 1:39)
+cogs$cog_cat = factor(cogs$cog_cat, rev(all))
+ggplot(cogs, aes(x = cluster, y = count, fill = cog_cat)) + geom_bar(stat = "identity", color = NA, size = 0.1) +
+  scale_fill_manual(values = c(NA,NA, rev(cols)[-c(1,2)]), guide = F) + theme_classic(base_size = 16)  + ylab("Genes") + xlab("Cluster")
 
+# ## check if there are differences between the clusters
+# barplot to see if there is a higher number of genes from a specific category in each cluster
+# for (c in unique(cogs$cog_cat)) {
+#   curr = cogs[which(cogs$cog_cat == c),]
+#   ## add missing values to dataframe
+#   for (gene_class in variable_order){
+#     for (cluster in 1:39){
+#       index = which(curr$gene_type == gene_class & curr$cluster == cluster)
+#       if (length(index) == 0){
+#         curr = rbind(curr, data.frame(
+#           cluster = cluster,
+#           gene_type = gene_class,
+#           cog_cat = c,
+#           count = 0,
+#           size = 0, stringsAsFactors = F
+#         ))
+#       }
+#     }
+#   }
+#   curr$cluster = factor(curr$cluster, 1:39)
+#   curr$gene_type = factor(curr$gene_type, variable_order)
+#   p = ggplot(curr, aes(x = cluster, y = count, fill = gene_type)) + geom_bar(stat = "identity", position = "dodge") +
+#     scale_fill_manual(values = gene_type_cols) + theme_classic(base_size = 16) + ggtitle(c)
+#   print(p)
+# }
 
-figures_out = "/Users/gh11/Submissions/ecoli_mobilome/figures/functions/per_cog_category/"
-## Look at how each COG category changes in count across all clusters
-for (c in unique(cogs$cog_cat)){
-  curr_cat = cogs[which(cogs$cog_cat == c),]
-  curr_cat$gene_type = factor(curr_cat$gene_type, rev(variable_order))
-  if (c != "?"){
-    desc = paste(c, descs$V2[which(descs$V1 == c)], sep = ": ")
-  } else {
-    desc = "Unknown"
-  }
-  p = ggplot(curr_cat, aes(x = gene_type, y = count)) + geom_point(size = 3, alpha = 0.6) +
-    theme_bw(base_size = 16) + ggtitle(desc) + xlab("")
-  out = paste(figures_out, c, ".pdf", sep = "")
-  ggsave(plot = p, filename = out, height = 4.5, width = 5)
-}
-
+### barplot showing how each COG category is distributed between the 4 gene classes
 barplot_df = data.frame(cog_cat = character(0), gene_type = character(0), count = numeric(0), sd = numeric(0), stringsAsFactors = F)
 for (c in unique(cogs$cog_cat)) {
   for (gene_type in variable_order) {
@@ -113,12 +105,12 @@ for (c in unique(cogs$cog_cat)) {
 
 barplot_df$gene_type = factor(barplot_df$gene_type, variable_order)
 barplot_df$cog_cat = factor(barplot_df$cog_cat, all)
-barplot_df = barplot_df[-which(!barplot_df$cog_cat %in% c("S","?")),]
+#barplot_df = barplot_df[-which(barplot_df$cog_cat %in% c("S","?")),]
 ggplot(barplot_df, aes(fill=gene_type, y=count, x=cog_cat)) + 
   geom_bar(stat="identity", color="black", size = 0.1,
            position=position_dodge()) + scale_fill_manual(values = gene_type_cols)+
   geom_errorbar(aes(ymin=count-sd, ymax=count+sd), width=.1,color = "black",
-                position=position_dodge(.9)) + theme_classic(base_size = 16) + ggtitle("Unknown functions") 
+                position=position_dodge(.9)) + theme_classic(base_size = 16) 
 
 
 

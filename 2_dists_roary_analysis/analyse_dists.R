@@ -1,6 +1,7 @@
 library(ggplot2)
 library(RColorBrewer)
 library(reshape2)
+library(ggpubr)
 
 setwd("/Users/gh11/poppunk_pangenome/2_dists_roary_analysis//")
 
@@ -12,8 +13,10 @@ cluster_sizes = read.table("cluster_sizes.csv", sep = ",",
 cluster_sizes = cluster_sizes[order(cluster_sizes$Size, decreasing = T),]
 cluster_sizes = cbind(ID = 1:dim(cluster_sizes)[1], cluster_sizes, Cumsum = cumsum(cluster_sizes$Size))
 
-temp = cluster_sizes[which(cluster_sizes$Size>=30),]
-temp$Cluster = factor(temp$Cluster, 1:39)
+
+temp = cluster_sizes[which(cluster_sizes$Size>20),]
+cluster_order = temp$Cluster[order(as.numeric(temp$Size), decreasing = T)]
+temp$Cluster = factor(temp$Cluster, cluster_order)
 ggplot(temp, aes(x = Cluster, y = Size)) + geom_bar(stat = "identity") +
   theme_classic(base_size = 18)  +ylab("Genomes") + xlab("Group")+
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
@@ -30,7 +33,7 @@ within_distances = read.table("all/within_cluster_dist.csv", sep = ",",
 between_distances = read.table("all/between_cluster_dist.csv", sep = ",",
                                header = T, stringsAsFactors = F, comment.char = "")
 
-chosen = cluster_sizes$Cluster[which(cluster_sizes$Size >= 30)]
+chosen = cluster_sizes$Cluster[which(cluster_sizes$Size >= 20)]
 
 ## add a color specifying which clusters I kept in the analysis
 chosen_within = rep("no",dim(within_distances)[1])
@@ -101,6 +104,10 @@ ggplot(within_distances, aes(y = Acc_median, x = size)) + geom_point(alpha = 0.4
 #   theme_bw(base_size = 16) + xlab("Cluster size") + ylab("Between cluster core distance")
 
 ### Combining poppunk output with the roary outputs
+variable_order = c("rare", "inter", "soft_core", "core")
+variable_2_order = c("small", "not_small")
+cols = brewer.pal(n = 5, "Blues")[-1]
+
 roary_outputs = read.table("roary_summary_file.csv", sep = ",", header = T, stringsAsFactors = F)
 ## add info to the roary outputs CSV
 sizes = cluster_sizes$Size[match(roary_outputs$cluster, cluster_sizes$Cluster)]
@@ -112,17 +119,14 @@ acc_max_dist = within_distances$Acc_max[match(roary_outputs$cluster, within_dist
 roary_outputs = cbind(roary_outputs, sizes, core_dist, core_max_dist, acc_dist, acc_max_dist)
 
 
-variable_order = c("rare", "inter", "soft_core", "core")
-variable_2_order = c("small", "not_small")
-cols = brewer.pal(n = 5, "Blues")[-1]
-
 roary_outputs = cbind(roary_outputs,
                         size = roary_outputs$sizes[match(roary_outputs$cluster, roary_outputs$cluster)])
 
 
 
-labs = c("Rare (present in less than <15% of isolates)", "Intermediate (present in 15% to 95%)", "Soft core (present in 95% to 99%)", "Core (present in >99% of isolates)")
-roary_outputs$cluster = factor(roary_outputs$cluster, sort(as.numeric(unique(roary_outputs$cluster))))
+# labs = c("Rare (present in less than <15% of isolates)", "Intermediate (present in 15% to 95%)", "Soft core (present in 95% to 99%)", "Core (present in >99% of isolates)")
+
+#roary_outputs$cluster = factor(roary_outputs$cluster, cluster_order)
 
 
 
@@ -137,7 +141,7 @@ ggplot(roary_outputs, aes(x = variable, y = count, color = length, fill = variab
 
 ## Collapse the length column
 roary_output_collapsed = data.frame(stringsAsFactors = F)
-for (i in 1:39){
+for (i in unique(roary_outputs$cluster)){
   for (j in variable_order) {
     lines = roary_outputs[which(roary_outputs$cluster == i & roary_outputs$variable == j),]
     new_line = lines[1,]
@@ -148,7 +152,9 @@ for (i in 1:39){
 roary_outputs = roary_output_collapsed
 
 ## Barplot
+cluster_order = unique(roary_outputs$cluster[order(roary_outputs$sizes, decreasing = T)])
 roary_outputs$variable = factor(roary_outputs$variable, variable_order)
+roary_outputs$cluster = factor(roary_outputs$cluster, cluster_order)
 ggplot(roary_outputs, aes(x = cluster, y = count, fill = variable)) + 
   geom_bar(stat = "identity", color = "black") + 
   scale_fill_manual(values = cols, labels = labs) + theme_classic(base_size = 16) +
@@ -176,13 +182,12 @@ ggplot(roary_outputs, aes(y = count, x = sizes, fill = variable)) +
   theme_bw(base_size = 16) + xlab("Cluster size") + ylab("Genes") +
   scale_fill_manual(values = cols, labels = labs)
 
-zoom_in = roary_outputs[which(roary_outputs$sizes < 800),]
-ggplot(zoom_in, aes(y = count, x = sizes, fill = variable)) + 
+ggplot(roary_outputs, aes(y = count, x = sizes, fill = variable)) + 
   geom_point(size = 3, pch=21, color = "black", alpha = 0.7) +
   theme_bw(base_size = 16) + xlab("Cluster size") + ylab("Genes") +
   scale_fill_manual(values = cols, guide = F)+ 
   geom_smooth(method='lm',formula= y~x, se = T, aes(color = variable)) +
-  scale_color_manual(values = cols, guide = F)
+  scale_color_manual(values = cols, guide = F) + scale_x_continuous(limits = c(0,600))
 
 
 

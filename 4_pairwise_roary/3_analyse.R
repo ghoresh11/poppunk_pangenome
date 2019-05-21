@@ -16,20 +16,24 @@ variable_order = c("rare","inter","core")
 
 
 
-#presence_absence = read.table("170419_complete_presence_absence.csv", header = F, 
- #                             stringsAsFactors = F, comment.char = "", quote = "", sep = ",")
+presence_absence = read.table("030519_complete_presence_absence.csv", header = F, 
+                              stringsAsFactors = F, comment.char = "", quote = "", sep = ",")
+## total number of gene clusters: 
 ## basic plots of gene frequencies
 
 
 
 
-freqs = read.table("freqs.csv", header = T, row.names = NULL,
+freqs = read.table("030519_freqs.csv", header = T, row.names = NULL,
                    stringsAsFactors = F, comment.char = "", quote = "", sep =",")
+
 #melted_freqs = read.table("melted_gene_freqs.csv", header = T, stringsAsFactors = F, comment.char = "", quote = "", sep = ",")
 
 
 ## TO draw a PCA plot of the genes to see if they can be separated according to specific rules
 for_pca = data.frame(t(freqs[,-c(1,2)]))
+write.table(x = for_pca, file = "/Users/gh11/Downloads/tsne_python/freqs_for_tsne.txt",
+            col.names = F, row.names = F, quote = F)
 # remove = c()
 # for (i in 1:dim(for_pca)[2]) {
 #   if (length(unique(for_pca[,i])) == 1) {
@@ -40,6 +44,7 @@ for_pca = data.frame(t(freqs[,-c(1,2)]))
 
 cluster_properties = read.table("cluster_props.csv", sep = ",", header = T,
                                 stringsAsFactors = F)
+cluster_properties = cluster_properties[-which(cluster_properties$Cluster == 21),]
 
 ### PCA plot of the clusters -> what are the relationships between the clusters based on the frequencies of all genes
 freqs.pca = prcomp(freqs[,-c(1,2)] , center = T, scale. = T)
@@ -59,6 +64,11 @@ ggplot(freqs.pca, aes(x = PC2, y = PC1, color = Cluster)) + geom_point(alpha = 0
   scale_color_manual(values =cluster_colors, guide = F) + theme_bw(base_size = 16) +
   geom_text(aes(label=Cluster),hjust=-0.2, vjust=-0.2)
 
+
+## View tsne results
+tsne_results = read.table("/Users")
+
+
 ## retain only genes which have a mean of less than 95%
 freqs_for_acc_pca = freqs[,-c(1,2)]
 remove = which(unlist(as.numeric(lapply(data.frame(t(freqs_for_acc_pca)), FUN = mean))) < 0.15)
@@ -73,14 +83,20 @@ ggplot(freqs_for_acc_pca, aes(x = PC1, y = PC2, color = Cluster)) + geom_point(a
   geom_text(aes(label=Cluster),hjust=-0.2, vjust=-0.2)
 
 
+
+
+
 between_cluster_dists = read.table("../2_dists_roary_analysis/between_cluster_dist.csv", sep = ",", 
                                    header = T, stringsAsFactors = F)
 between_cluster_dists = cbind(between_cluster_dists,
                               PC1 = rep(0, dim(between_cluster_dists)[1]),
                               PC2 = rep(0, dim(between_cluster_dists)[1]))
+between_cluster_dists = between_cluster_dists[-which(between_cluster_dists$cluster1 == 21 | between_cluster_dists$cluster2 == 21),]
+
 ## compare PCA to poppunk distances
 for (i in 1:38) {
   for (j in (i+1):39) {
+    if (i == 21 || j == 21) {next}
     index = which(between_cluster_dists$cluster1 == i &
                     between_cluster_dists$cluster2 == j)
     between_cluster_dists$PC1[index] = abs(freqs.pca$PC1[i] - freqs.pca$PC1[j])
@@ -95,31 +111,29 @@ ggplot(between_cluster_dists, aes(x = core_median, y = PC2)) + geom_point(size =
 ggplot(between_cluster_dists, aes(x = accessory_median, y = PC2)) + geom_point(size = 2, alpha = 0.7) +
   theme_bw(base_size = 16) + xlab("Accessory poppunk distance") + ylab("PC2 pairwise distance")
 
-plot(between_cluster_dists$euc, between_cluster_dists$PC2)
-
 ## Trying to answer these questions:
 #1. How many rare/core genes are shared?
 #2. How many core genes are shared?
-# gene_classes = data.frame(gene = freqs$Gene, 
-#                           cog = freqs$COG,
-#                           core = rep(0, dim(freqs)[1]),
-#                           inter = rep(0, dim(freqs)[1]),
-#                           rare = rep(0, dim(freqs)[1]),
-#                           absent = rep(0, dim(freqs)[1]), stringsAsFactors = F)
-# for (i in 1:dim(freqs)[1]){
-#   curr_vec = freqs[i,-c(1,2)]
-#   gene_classes$core[i] = length(which(curr_vec >= 0.95))
-#   gene_classes$inter[i] = length(which(curr_vec < 0.95 & curr_vec >= 0.15)) 
-#   gene_classes$rare[i] =  length(which(curr_vec < 0.15 & curr_vec > 0))
-# }
-# 
-# 
-# write.table(x = gene_classes, file  = "gene_classes.csv", sep = ",", col.names = T, row.names = F, quote = F)
-gene_classes = read.table("gene_classes.csv", sep = ",", header = T, stringsAsFactors = F, comment.char = "", quote = "")
+gene_classes = data.frame(gene = freqs$Gene,
+                          cog = freqs$COG,
+                          core = rep(0, dim(freqs)[1]),
+                          inter = rep(0, dim(freqs)[1]),
+                          rare = rep(0, dim(freqs)[1]),
+                          absent = rep(0, dim(freqs)[1]), stringsAsFactors = F)
+for (i in 1:dim(freqs)[1]){
+  curr_vec = freqs[i,-c(1,2)]
+  gene_classes$core[i] = length(which(curr_vec >= 0.95))
+  gene_classes$inter[i] = length(which(curr_vec < 0.95 & curr_vec >= 0.15))
+  gene_classes$rare[i] =  length(which(curr_vec < 0.15 & curr_vec > 0))
+}
+
+
+write.table(x = gene_classes, file  = "030519_gene_classes.csv", sep = ",", col.names = T, row.names = F, quote = F)
+gene_classes = read.table("030519_gene_classes.csv", sep = ",", header = T, stringsAsFactors = F, comment.char = "", quote = "")
 
 ### check if the lack of a gene is uniformly distributed or if it's always the same cluster
 ## Good to have these plots, but not sure how to interpret them...
-for (j in 1:38){
+for (j in 1:37){
   thirty_eight = gene_classes$gene[which(gene_classes$core == j)]
   thirty_eight = freqs[which(freqs$Gene %in% thirty_eight),]
   vec = c()
@@ -192,11 +206,14 @@ ggplot(rare_table, aes(x = Var2, y = Freq, fill = Var1)) +geom_bar(stat = "ident
 
 
 
-## so 1030 are core only to one group, but rare or inter in a different group
+## so 1,344 are core only to one group, but rare or inter in a different group
+length(which(gene_classes$core == 38))
+## it would be interesting to randomly remove one group from the population and see how much that changes the number of
+## core genes, it should be robust to that which to me means this is the "TRUE" core of E. coli
 
 ## how many core genes are rare/intermediate in other clusters?
 t = melt(core[,3:5], id.vars = "core")
-t$core = factor(t$core, 1:39)
+t$core = factor(t$core, 1:38)
 t$variable = factor(t$variable, c("rare","inter"))
 ggplot(t, aes(x = core, fill = variable, y = value)) + geom_bar(stat = "identity") +
   theme_classic(base_size = 16) + scale_fill_manual(values = brewer.pal(n = 4, "Greys")[2:3]) + 

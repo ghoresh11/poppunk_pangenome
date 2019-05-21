@@ -31,7 +31,7 @@ props$class = factor(props$class, variables)
 
 ### FUNCTIONS ###
 
-plot_boxplot_per_prop <- function(name, props, column, path, xlabs, ylab, colors, log = F){
+plot_boxplot_per_prop <- function(name, props, column, path, xlabs, ylab, colors, zoom = F, max = 1000, log = F){
   colnames(props)[which(colnames(props) == name)] = "Class"
   colnames(props)[which(colnames(props) == column)] = "Var"
   if (log) {
@@ -42,6 +42,10 @@ plot_boxplot_per_prop <- function(name, props, column, path, xlabs, ylab, colors
     theme_classic(base_size = 16) + scale_fill_manual(values = colors, guide = F)+ 
     scale_x_discrete(labels = labs)+ theme(axis.text.x = element_text(angle=45, hjust = 1)) +
     ylab(ylab)
+  if (zoom) {
+    p = p + scale_y_continuous(limits = c(0, max))
+    name = paste(name, "_zoomed", sep = "")
+  }
   ggsave(p, file = paste(path, name, "_", column, ".pdf", sep = ""), width = 7, height = 4)
 }
 
@@ -80,9 +84,12 @@ plot_size_to_genes_stratifies<- function(props, gene_type, property_column, prop
 labs = c("Filtered by Roary", "Rare", "Intermediate", "Soft core", "Core")
 colors = brewer.pal(n = 5, "Blues")
 plot_boxplot_per_prop("class", props, "GC", "figures/", labs, "%GC", colors)
-plot_boxplot_per_prop("class", props, "mean_length", "figures/", labs, "Gene length (log10(aa))", colors, log = T)
-plot_boxplot_per_prop("class", props, "mean_pos", "figures/", labs, "Distance from edge (log10(bp))", colors, log = T)
-plot_boxplot_per_prop("class", props, "mean_contig_length", "figures/",labs, "Contig length (log10(bp))", colors, log = T)
+plot_boxplot_per_prop("class", props, "mean_length", "figures/", labs, "Protein length (aa)", colors)
+plot_boxplot_per_prop("class", props, "mean_pos", "figures/", labs, "Distance from edge (bp)", colors)
+plot_boxplot_per_prop("class", props, "mean_contig_length", "figures/",labs, "Contig length (bp)", colors)
+plot_boxplot_per_prop("class", props, "mean_length", "figures/", labs, "Protein length (aa)", colors, zoom = T, max = 1000)
+plot_boxplot_per_prop("class", props, "mean_pos", "figures/", labs, "Distance from edge (bp)", colors, zoom = T, max = 200000)
+plot_boxplot_per_prop("class", props, "mean_contig_length", "figures/",labs, "Contig length (bp)", colors, zoom = T, max = 1000000)
 
 # ## How do these metrics correlate with each other? 
 # ## DO smaller genes also have low GC content?NO

@@ -16,8 +16,8 @@ import subprocess
 #          -s        dont split paralogs
 
 
-jobs_dir= "/lustre/scratch118/infgen/team216/gh11/e_coli_collections/poppunk/dists_analysis/gff_jobs"
-roary_out_dir= "/lustre/scratch118/infgen/team216/gh11/e_coli_collections/poppunk/dists_analysis/roary_outputs"
+jobs_dir= "/lustre/scratch118/infgen/team216/gh11/e_coli_collections/poppunk/new_roary/new_jobs/"
+roary_out_dir= "/lustre/scratch118/infgen/team216/gh11/e_coli_collections/poppunk/new_roary/"
 jobs = os.listdir(jobs_dir)
 threads = "16"
 blastp = "/software/pubseq/bin/ncbi_blast+/blastp"
@@ -32,8 +32,9 @@ for jobs_file in jobs:
         for line in f:
             gffs.append(line.strip())
 
-    if cluster_id not in ["10", "11", "13", "16", "17","19", "31", "33", "37", "7"]:
-        continue
+    ## if some failed: apply here:
+    # if cluster_id not in ["10", "11", "13", "16", "17","19", "31", "33", "37", "7"]:
+    #     continue
     ## calculate how much memory is required (more or less)
     ## according to my calcs each genomes needs about 30MBs
     # I might be off, but I'll start with lower memory request

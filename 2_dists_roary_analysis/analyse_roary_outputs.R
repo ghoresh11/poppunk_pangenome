@@ -41,3 +41,6 @@ ggplot(df, aes(x = genomes, y = richness, color = cluster)) + geom_line(size = 2
 
 
 write.table(tree, "../7_tree/tree.txt", col.names = F, row.names = F, quote = F, sep = ",")
+
+
+

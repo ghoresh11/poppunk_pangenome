@@ -18,23 +18,20 @@ plasmid_summary_all.csv
 2_dists_roary_analysis/*.csv
 2_dists_roary_analysis/*.cys
 2_dists_roary_analysis/gene_presence_absences/
+2_dists_roary_analysis/orig/
 
-4_vir_amr_phage/gene_DB_hits/
-3_eggnog/eggnog/
-3_eggnog/*.csv
-3.1_gene_properties/figures/
+X_vir_amr_phage/gene_DB_hits/
+X_eggnog/eggnog/
+X_eggnog/*.csv
+3_gene_properties/figures/
 
-3.1_gene_properties/results/
-5_roary_on_class/rare
-5_roary_on_class/soft_core
-5_roary_on_class/core
-5_roary_on_class/inter
-5_roary_on_class/gff_jobs/
+3_gene_properties/results/
 
-6_pairwise_roary/nodes.txt
-6_pairwise_roary/edges.txt
-6_pairwise_roary/networks.cys
-6_pairwise_roary/*.csv
+4_pairwise_roary/*nodes.txt
+4_pairwise_roary/*edges.txt
+4_pairwise_roary/networks.cys
+4_pairwise_roary/*.csv
+4_pairwise_roary/specific_genes/
 
 
 ## the virulenceFinder,RESfinder and PHASTER databases

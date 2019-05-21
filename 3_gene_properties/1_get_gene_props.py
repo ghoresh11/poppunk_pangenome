@@ -98,10 +98,10 @@ def get_props_for_one_genome(args, properties, genome_name, gene_cluster, gene_r
             contig_length = contig_lengths[toks[0]]
             properties[curr_cluster]["contig_lengths"].append(contig_length)
             if toks[6] == "+":
-                end = float(toks[4])
+                distance = contig_length - float(toks[4])
             else:
-                end = contig_length - float(toks[3]) ## minus strand
-            properties[curr_cluster]["positions"].append(contig_length - end)
+                distance = float(toks[3]) ## minus strand
+            properties[curr_cluster]["positions"].append(distance)
             properties[curr_cluster]["protein_length"].append((int(toks[4]) - int(toks[3]) + 1) / 3.0)
     return
 

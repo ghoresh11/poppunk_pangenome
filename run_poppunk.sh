@@ -69,14 +69,37 @@ python run_roary.py
 
 
 ### merge the rare genes by running blast again on them with a more linient threshold
-job_name=merge_rares
-bsub -J ${job_name} -R"select[mem>1000] rusage[mem=1000]" -M1000  -G team216 -o ${job_name}.o -e ${job_name}.e python extract_gene_sequences.py
+# job_name=merge_rares
+# bsub -J ${job_name} -R"select[mem>1000] rusage[mem=1000]" -M1000  -G team216 -o ${job_name}.o -e ${job_name}.e python extract_gene_sequences.py
 
+## THis script essentially summarises all the roary outputs and generates a fasta file for all gene types
 job_name=gene_extraction
 bsub -q parallel -J ${job_name} -R"select[mem>3000] rusage[mem=3000]" -M3000  -G team216 -o ${job_name}.o -e ${job_name}.e -n16 -R"span[hosts=1]" python extract_gene_sequences.py
+
+
+## At this stage: run-eggnog and also need to add here to compare to known databases so
+## that there's an extra column - in addition to the eggnog column, saying
+## "AMR", "Phage" or "Vir", to add more specific annotation
+
+### After running roary, this is in 3.1 to extract all the properties of all the genes
+## get the properties of all the genes
+## most clusters only need 500MB, cluster 2 compeleted with 1GB and 1 with 4GB
+## this submits with the correct memory allocation for the different clusters
+job_name=props
+for i in $(seq 1 1); do
+if [ $i -eq 1 ]; then
+mem=6000
+elif [ $i -eq 2 ]; then
+mem=1000
+else
+mem=500
+fi
+bsub -J ${job_name}_${i} -R"select[mem>${mem}] rusage[mem=${mem}]" -M${mem}  -G team216 -o ${job_name}_${i}.o -e ${job_name}_${i}.e  python 1_get_gene_props.py --cluster ${i};
+done
 
 ## after extracting genes, blast them against Phage, Virulence and AMR
 job_name=blast_dbs
 for i in $(seq 1 39);
-do bsub -q parallel -J ${job_name}_${i} -R"select[mem>5000] rusage[mem=5000]" -M5000  -G team216 -o ${job_name}_${i}.o -e ${job_name}_${i}.e -n8 -R"span[hosts=1]" python blast_against_DBs.py --cluster ${i};
+#do bsub -q parallel -J ${job_name}_${i} -R"select[mem>5000] rusage[mem=5000]" -M5000  -G team216 -o ${job_name}_${i}.o -e ${job_name}_${i}.e -n8 -R"span[hosts=1]" python blast_against_DBs.py --cluster ${i};
+do python blast_against_DBs.py --cluster ${i};
 done

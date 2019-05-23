@@ -6,7 +6,7 @@ library(ggpubr)
 setwd("/Users/gh11/poppunk_pangenome/2_dists_roary_analysis//")
 
 
-cluster_sizes = read.table("cluster_sizes.csv", sep = ",",
+cluster_sizes = read.table("cluster_sizes_updated.csv", sep = ",",
                            header = T, stringsAsFactors = F)
 
 ## draw a point plot with the cluster sizes
@@ -22,7 +22,7 @@ ggplot(temp, aes(x = Cluster, y = Size)) + geom_bar(stat = "identity") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
 ggplot(cluster_sizes, aes(x = ID ,y = cluster_sizes$Cumsum)) + geom_point(alpha = 0.5, size = 3) +
-  xlab("poppunk cluster") + ylab("Total number of genomes") + geom_vline(xintercept=39, col = "red") +
+  xlab("poppunk cluster") + ylab("Total number of genomes") +
   scale_y_continuous(limits = c(0, 13500)) + theme_bw(base_size = 16)
 
 ## this goes up to 519, because from 520 the clusters are of size 1 so there's no distance
@@ -124,7 +124,7 @@ roary_outputs = cbind(roary_outputs,
 
 
 
-# labs = c("Rare (present in less than <15% of isolates)", "Intermediate (present in 15% to 95%)", "Soft core (present in 95% to 99%)", "Core (present in >99% of isolates)")
+labs = c("Rare (present in less than <15% of isolates)", "Intermediate (present in 15% to 95%)", "Soft core (present in 95% to 99%)", "Core (present in >99% of isolates)")
 
 #roary_outputs$cluster = factor(roary_outputs$cluster, cluster_order)
 
@@ -187,7 +187,8 @@ ggplot(roary_outputs, aes(y = count, x = sizes, fill = variable)) +
   theme_bw(base_size = 16) + xlab("Cluster size") + ylab("Genes") +
   scale_fill_manual(values = cols, guide = F)+ 
   geom_smooth(method='lm',formula= y~x, se = T, aes(color = variable)) +
-  scale_color_manual(values = cols, guide = F) + scale_x_continuous(limits = c(0,600))
+  scale_color_manual(values = cols, guide = F) 
+#+ scale_x_continuous(limits = c(0,600))
 
 
 

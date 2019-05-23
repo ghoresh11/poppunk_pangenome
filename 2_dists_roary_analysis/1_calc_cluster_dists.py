@@ -66,6 +66,16 @@ def get_cluster_sizes(clusters_file, out):
     return (clusters, cluster_size)
 
 
+def get_updated_cluster_sizes():
+    cluster_sizes = {}
+    with open("cluster_sizes_updated.csv") as f:
+        for line in f:
+            if line.startswith("Cluster"):
+                continue
+            toks = line.strip().split(",")
+            cluster_sizes[toks[0]] = int(toks[1])
+    return cluster_sizes
+
 def metadata_per_cluster(metadata_file, cluster_sizes, clusters, min_cluster_size, out):
     ''' generate a new clusters output so that I can generate bar/piecharts
     where I know exactly how many of each ST, pathotype, etc. are in each of the
@@ -84,62 +94,60 @@ def metadata_per_cluster(metadata_file, cluster_sizes, clusters, min_cluster_siz
             if line.startswith("ID"):
                 indexs = [toks.index(i) for i in variables]
                 assembly_index = toks.index("Assembly_Location")
+                poppunk_index = toks.index("Poppunk_cluster")
                 continue
-            assemblies = toks[assembly_index].split(",")
-            for a in assemblies:
-                if a not in clusters: ## some are problematic
-                    continue
-                cluster = clusters[a]
-                if cluster_sizes[cluster] < min_cluster_size:
-                    continue
+            cluster = toks[poppunk_index]
+            if toks[poppunk_index] not in cluster_sizes.keys():
+                continue
 
-                all_metadata[a] = {}
-                if cluster not in clusters_metadata:
-                    clusters_metadata[cluster] = {}
-                    for v in variables:
-                        clusters_metadata[cluster][v] = {}
-                for i in range(len(variables)):
-                    curr_value = toks[indexs[i]]
-                    v = variables[i]
-                    ## fix the metadata outputs:
-                    curr_value = curr_value.replace("~","") ## remove "~" from STs
-                    if v == "Isolation" and curr_value not in ["feces","urine","blood"]:
-                        curr_value = "other/unknown"
-                    elif "ehec" in curr_value:
-                        curr_value = "ehec"
-                    elif "aeec" in curr_value:
-                        curr_value = "epec/eaec"
-                    elif curr_value == "upec":
-                        curr_value = "expec"
-                    elif v == "Year":
-                        curr_value = curr_value.replace("s","")
-                        curr_value = curr_value.split("-")
-                        try:
-                            curr_value = map(int, curr_value)
-                            curr_value = mean(curr_value)
-                        except Exception:
-                            curr_value = "nd"
-                    elif "public health england" in curr_value:
-                        curr_value = "phe"
-                    elif "fda" in curr_value or "food and drug administration" in curr_value:
-                        curr_value = "fda"
-                    elif "sanger" in curr_value:
-                        curr_value = "sanger"
-                    elif "centers for disease control" in curr_value or "cdc" in curr_value:
-                        curr_value = "cdc"
-                    elif "kallonen2017_bsac" in curr_value:
-                        curr_value = "bsac"
-                    elif "hazen2013" in curr_value:
-                        curr_value = "hazen2013"
-                    elif "ingle2016" in curr_value:
-                        curr_value = "ingle2016"
+            a = toks[assembly_index].split(",")[0]
+            all_metadata[a] = {}
+            if cluster not in clusters_metadata:
+                clusters_metadata[cluster] = {}
+                for v in variables:
+                    clusters_metadata[cluster][v] = {}
+            for i in range(len(variables)):
+                curr_value = toks[indexs[i]]
+                v = variables[i]
+                ## fix the metadata outputs:
+                curr_value = curr_value.replace("~","") ## remove "~" from STs
+                if v == "Isolation" and curr_value not in ["feces","urine","blood"]:
+                    curr_value = "other/unknown"
+                elif "ehec" in curr_value:
+                    curr_value = "ehec"
+                elif "aeec" in curr_value:
+                    curr_value = "epec/eaec"
+                elif curr_value == "upec":
+                    curr_value = "expec"
+                elif v == "Year":
+                    curr_value = curr_value.replace("s","")
+                    curr_value = curr_value.split("-")
+                    try:
+                        curr_value = map(int, curr_value)
+                        curr_value = mean(curr_value)
+                    except Exception:
+                        curr_value = "nd"
+                elif "public health england" in curr_value:
+                    curr_value = "phe"
+                elif "fda" in curr_value or "food and drug administration" in curr_value:
+                    curr_value = "fda"
+                elif "sanger" in curr_value:
+                    curr_value = "sanger"
+                elif "centers for disease control" in curr_value or "cdc" in curr_value:
+                    curr_value = "cdc"
+                elif "kallonen2017_bsac" in curr_value:
+                    curr_value = "bsac"
+                elif "hazen2013" in curr_value:
+                    curr_value = "hazen2013"
+                elif "ingle2016" in curr_value:
+                    curr_value = "ingle2016"
 
-                    ## this value has never been seen for this cluster
-                    if curr_value not in clusters_metadata[cluster][v]:
-                        clusters_metadata[cluster][v][curr_value] = 0
-                    ## add count by one for this value in this variable in this cluster
-                    clusters_metadata[cluster][v][curr_value] += 1
-                    all_metadata[a][v] = curr_value
+                ## this value has never been seen for this cluster
+                if curr_value not in clusters_metadata[cluster][v]:
+                    clusters_metadata[cluster][v][curr_value] = 0
+                ## add count by one for this value in this variable in this cluster
+                clusters_metadata[cluster][v][curr_value] += 1
+                all_metadata[a][v] = curr_value
 
     ## generate the melted output file -> easy to work with in R
     out = open(os.path.join(out,"metadata_per_cluster.csv"),"w")
@@ -298,7 +306,9 @@ def run(args):
     args.metadata_file = os.path.abspath(args.metadata_file)
     fa_to_gff = assemblies_to_gffs(args.metadata_file)
     clusters, cluster_sizes = get_cluster_sizes(args.clusters_file, args.out)
+    cluster_sizes = get_updated_cluster_sizes( )
     all_metadata = metadata_per_cluster(args.metadata_file, cluster_sizes, clusters, args.min_cluster_size, args.out)
+    quit()
     within_cluster_dist = get_dist_within_cluster(clusters, cluster_sizes,
     args.dists_file, args.out, args.min_cluster_size, fa_to_gff, all_metadata)
     quit()

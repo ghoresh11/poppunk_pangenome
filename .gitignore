@@ -32,6 +32,7 @@ X_eggnog/*.csv
 4_pairwise_roary/networks.cys
 4_pairwise_roary/*.csv
 4_pairwise_roary/specific_genes/
+4_pairwise_roary/snp_trees/
 
 X_
 

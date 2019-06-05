@@ -15,6 +15,8 @@ def get_input_dirs(input_dir):
     directories = [x[0] for x in os.walk(input_dir)]
     dirs_to_return = []
     for d in directories:
+        if "pairwise" in d:
+            continue
         if os.path.isfile(os.path.join(d, "pan_genome_reference.fa")) and os.path.isfile(os.path.join(d, "gene_presence_absence.csv")) and os.path.isfile(os.path.join(d, "gene_presence_absence.Rtab")):
             # for debugging, uncomment:
             # if d.split("/")[-1].split("_")[0] != "39":

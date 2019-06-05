@@ -13,6 +13,9 @@ cluster_sizes = read.table("cluster_sizes_updated.csv", sep = ",",
 cluster_sizes = cluster_sizes[order(cluster_sizes$Size, decreasing = T),]
 cluster_sizes = cbind(ID = 1:dim(cluster_sizes)[1], cluster_sizes, Cumsum = cumsum(cluster_sizes$Size))
 
+ggplot(cluster_sizes, aes(x = ID ,y = cluster_sizes$Cumsum)) + geom_point(alpha = 0.5, size = 3) +
+  xlab("poppunk cluster") + ylab("Total number of genomes") +
+  scale_y_continuous(limits = c(0, 13500)) + theme_bw(base_size = 16)
 
 temp = cluster_sizes[which(cluster_sizes$Size>20),]
 cluster_order = temp$Cluster[order(as.numeric(temp$Size), decreasing = T)]
@@ -21,9 +24,7 @@ ggplot(temp, aes(x = Cluster, y = Size)) + geom_bar(stat = "identity") +
   theme_classic(base_size = 18)  +ylab("Genomes") + xlab("Group")+
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
-ggplot(cluster_sizes, aes(x = ID ,y = cluster_sizes$Cumsum)) + geom_point(alpha = 0.5, size = 3) +
-  xlab("poppunk cluster") + ylab("Total number of genomes") +
-  scale_y_continuous(limits = c(0, 13500)) + theme_bw(base_size = 16)
+
 
 ## this goes up to 519, because from 520 the clusters are of size 1 so there's no distance
 within_distances = read.table("all/within_cluster_dist.csv", sep = ",",
@@ -124,7 +125,7 @@ roary_outputs = cbind(roary_outputs,
 
 
 
-labs = c("Rare (present in less than <15% of isolates)", "Intermediate (present in 15% to 95%)", "Soft core (present in 95% to 99%)", "Core (present in >99% of isolates)")
+labs = c("Rare (present in fewer than <15% of isolates)", "Intermediate (present in 15% to 95%)", "Soft core (present in 95% to 99%)", "Core (present in >99% of isolates)")
 
 #roary_outputs$cluster = factor(roary_outputs$cluster, cluster_order)
 
@@ -155,12 +156,12 @@ roary_outputs = roary_output_collapsed
 cluster_order = unique(roary_outputs$cluster[order(roary_outputs$sizes, decreasing = T)])
 roary_outputs$variable = factor(roary_outputs$variable, variable_order)
 roary_outputs$cluster = factor(roary_outputs$cluster, cluster_order)
-ggplot(roary_outputs, aes(x = cluster, y = count, fill = variable)) + 
+C = ggplot(roary_outputs, aes(x = cluster, y = count, fill = variable)) + 
   geom_bar(stat = "identity", color = "black") + 
-  scale_fill_manual(values = cols, labels = labs) + theme_classic(base_size = 16) +
+  scale_fill_manual(values = cols, labels = labs, name = "") + theme_classic(base_size = 12) +
   scale_y_continuous(expand = c(0,0)) + xlab("Cluster") + 
-  ylab("Genes") 
-
+  ylab("Genes") + ggtitle("C") + theme(legend.position = "bottom") + guides(fill=guide_legend(nrow=3, byrow = T))
+C
 
 
 ## General values to keep track of
@@ -182,15 +183,12 @@ ggplot(roary_outputs, aes(y = count, x = sizes, fill = variable)) +
   theme_bw(base_size = 16) + xlab("Cluster size") + ylab("Genes") +
   scale_fill_manual(values = cols, labels = labs)
 
-ggplot(roary_outputs, aes(y = count, x = sizes, fill = variable)) + 
+D = ggplot(roary_outputs, aes(y = count, x = sizes, fill = variable)) + 
   geom_point(size = 3, pch=21, color = "black", alpha = 0.7) +
-  theme_bw(base_size = 16) + xlab("Cluster size") + ylab("Genes") +
-  scale_fill_manual(values = cols, guide = F)+ 
-  geom_smooth(method='lm',formula= y~x, se = T, aes(color = variable)) +
-  scale_color_manual(values = cols, guide = F) 
-#+ scale_x_continuous(limits = c(0,600))
-
-
+  theme_bw(base_size = 12) + xlab("Cluster size") + ylab("Genes") +
+  scale_fill_manual(values = cols, guide = F) +  geom_smooth(method = "gam", formula = y ~ s(log(x)), aes(color = variable)) +
+  scale_color_manual(values = cols, guide = F) + ggtitle("D")
+D
 
 ## add distances
 ggplot(roary_outputs, aes(y = count, x = acc_dist, fill = variable)) + 
@@ -206,16 +204,18 @@ ggplot(roary_outputs, aes(y = count, x = core_dist, fill = variable)) + geom_poi
 
 
 ### Piarwise distances between every two clusters
-pairwise_core_matrix = matrix(0, nrow = 39, ncol = 39)
-pairwise_acc_matrix = matrix(0, nrow = 39, ncol = 39)
-for (i in 1:38) {
-  for (j in (i+1):39) {
+pairwise_core_matrix = matrix(0, nrow = 50, ncol = 50)
+pairwise_acc_matrix = matrix(0, nrow = 50, ncol = 50)
+for (k_i in 1:49) {
+  for (k_j in (k_i+1):50) {
+    i = cluster_sizes$Cluster[k_i]
+    j = cluster_sizes$Cluster[k_j]
     index = which((between_distances$cluster1 == i & between_distances$cluster2 == j) |
              (between_distances$cluster1 == j & between_distances$cluster2 == i))
-    pairwise_core_matrix[i,j] = between_distances$core_median[index]
-    pairwise_core_matrix[j,i] = between_distances$core_median[index]
-    pairwise_acc_matrix[i,j] = between_distances$accessory_median[index]
-    pairwise_acc_matrix[j,i] = between_distances$accessory_median[index]
+    pairwise_core_matrix[k_i,k_j] = between_distances$core_median[index]
+    pairwise_core_matrix[k_j,k_i] = between_distances$core_median[index]
+    pairwise_acc_matrix[k_i,k_j] = between_distances$accessory_median[index]
+    pairwise_acc_matrix[k_j,k_i] = between_distances$accessory_median[index]
   }
 }
 
@@ -248,7 +248,7 @@ plot_matrix <- function(m, legend, names){
   return (p)
 }                                            
 
-plot_matrix(pairwise_core_matrix, "Core", 1:39)
-plot_matrix(pairwise_acc_matrix, "Accessory", 1:39)
+plot_matrix(pairwise_core_matrix, "Core", cluster_sizes$Cluster)
+plot_matrix(pairwise_acc_matrix, "Accessory", cluster_sizes$Cluster)
 
 plot(between_distances$core_median[chosen], between_distances$accessory_median[chosen])

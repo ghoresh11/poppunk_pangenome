@@ -11,24 +11,64 @@ cluster_order = read.table("cluster_sizes_updated.csv", sep = ",", header = T, s
 cluster_order = cluster_order$Cluster
 clusters = unique(metadata$cluster)
 
+
+
+
+
+
 ### ST
 ST = metadata[which(metadata$variable == "ST"),]
 ## count = data.frame(table(ST$value)) ## other than ST131,10,59 -> each ST is confined to one poppunk cluster
-for (c in clusters){
+
+plot_piechart_for_ST <- function(c,min, title){
   curr_df = ST[which(ST$cluster == c),]
-  curr_df$cluster = as.character(curr_df$cluster)
-  p = ggplot(curr_df, aes(x = cluster, y = count, fill = value)) +
-    geom_bar(stat = "identity", width = 1)+ coord_polar(theta="y") +
-    theme_minimal(base_size = 16) +
+  #return(curr_df$value[which(curr_df$count == max(curr_df$count))])
+#  curr_df$cluster = as.character(curr_df$cluster)
+  small = which(curr_df$count < min)
+  if (length(small) > 0){
+    curr_df = curr_df[-small,]
+    curr_df = rbind(curr_df,
+                    data.frame(cluster = c, variable = "ST", count = 1 - sum(curr_df$count), value =  "Other",
+                               stringsAsFactors = F))
+  }
+  o =  curr_df$value[order(curr_df$count, decreasing = T)]
+  if ("Other" %in% o){
+    o = o[-which(o == "Other")]
+    o = c(o, "Other")
+  }
+  curr_df$value = factor(curr_df$value,o)
+  num_cols = length(unique(curr_df$value))
+  colors = brewer.pal(n = 8, "Set2")[1:num_cols]
+  colors = c(colors, rep("white", dim(curr_df)[1]))
+  p =   ggplot(curr_df, aes(x = cluster, y = count, fill = value)) +
+    geom_bar(stat = "identity", width = 1, color = "black")+ coord_polar(theta="y") +
+    theme_minimal(base_size = 12) +
     xlab("") + ylab("")+
     theme(axis.text = element_blank(),
           axis.ticks = element_blank(),
           panel.grid  = element_blank()) +
-    ggtitle(paste("Cluster: ",c, "\nVar: ", "ST", sep = ""))
-  ggsave(plot = p,
-         filename = paste("/Users/gh11/Submissions/my_thesis/Chapter3/figures/4_clusters_metadata/ST/", c ,".png", sep = ""),
-         height = 4, width = 5)
+    ggtitle(paste("Cluster:",c)) +
+    scale_fill_manual(values = colors, name = "")+ theme(legend.position="bottom")  +
+    guides(fill=guide_legend(nrow = 4, byrow=T)) + ggtitle(title) +
+    labs(subtitle = paste("Cluster:", c))
+
+  return(p)
 }
+
+pie1 = plot_piechart_for_ST(1, 0.001, "E") ## FOR THIS ONE ADD ST AS NAME
+pie2 = plot_piechart_for_ST(2, 0.001, "F")
+pie3 = plot_piechart_for_ST(3, 0.0025, "G")
+pie4 = plot_piechart_for_ST(17, 0.0025, "H")
+pie5 = plot_piechart_for_ST(40, 0.0025, "I")
+
+### TO make a file of the most common ST in each cluster (can also look at the porportion)
+# df = data.frame(i = 1:51, ans = rep("", 51), stringsAsFactors = F)
+# for (i in 1:51){
+#   df$ans[i] =  plot_piechart_for_ST(i, 0.0025, "I")
+# }
+# write.table(x = df, file = "/Users/gh11/Desktop/common_sts.csv", row.names = F, col.names = F, quote = F, sep=",")
+# plot_piechart_for_ST(51)
+
 # 
 ## MASH
 # MASH = metadata[which(metadata$variable == "MASH"),]
@@ -39,52 +79,88 @@ for (c in clusters){
 
 outpath = "/Users/gh11/Submissions/my_thesis/Chapter3/figures/4_clusters_metadata/"
 
-Pathotype = metadata[which(metadata$variable == "Pathotype"),]
-Pathotype$cluster = factor(Pathotype$cluster, cluster_order)
-Pathotype$value = factor(Pathotype$value, c("nd", "epec", "etec","ehec","stec","expec", "eaec","epec/eaec","commensal"))
-cols = c("#dddddd", brewer.pal(n = 7, "Set2"), "#4c4cff")
-p = ggplot(Pathotype, aes( x = cluster, y = count, fill = value)) + geom_bar(stat = "identity", color = "black") +
-  scale_fill_manual(values = cols) + theme_bw(base_size = 16) +
-  xlab("Cluster") + ylab("% of isolates")
-ggsave(plot =  p, file = paste(outpath, "Pathotype.pdf", sep = ""), height = 3, width = 15)
+plot_metadata_per_cluster<- function(name, order, cols, title){
+  Continent = metadata[which(metadata$variable == name),]
+  Continent$cluster = factor(Continent$cluster, cluster_order)
+  Continent$value = factor(Continent$value, order)
+  p = ggplot(Continent, aes( x = cluster, y = count, fill = value)) + geom_bar(stat = "identity", color = "black") +
+    theme_classic(base_size = 12) + scale_fill_manual(values = cols, name = name)+
+    xlab("Cluster") + ylab("Fraction of isolates") + scale_y_continuous(expand = c(0,0)) + ggtitle(title)+ 
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) + theme(legend.position = "bottom")
 
-Continent = metadata[which(metadata$variable == "Continent"),]
-Continent$cluster = factor(Continent$cluster, cluster_order)
-Continent$value = factor(Continent$value, c("Europe", "North America","Africa","Asia","Oceania", "South America","nd"))
-cols = c( brewer.pal(n = 6, "Set2"), "#dddddd")
-p = ggplot(Continent, aes( x = cluster, y = count, fill = value)) + geom_bar(stat = "identity", color = "black") +
-  theme_bw(base_size = 16) + scale_fill_manual(values = cols)+
-  xlab("Cluster") + ylab("% of isolates")
-ggsave(plot =  p, file = paste(outpath, "Continent.pdf", sep = ""), height = 3, width = 15)
-
-Isolation = metadata[which(metadata$variable == "Isolation"),]
-Isolation$cluster = factor(Isolation$cluster, cluster_order)
-Isolation$value = factor(Isolation$value, rev(c("feces","blood","urine","other/unknown")))
-cols =rev( c(brewer.pal(n = 3, "Set2"),"#dddddd"))
-p = ggplot(Isolation, aes( x = cluster, y = count, fill = value)) +
-  geom_bar(stat = "identity", color = "black") + scale_fill_manual(values = cols, name = "Isolation")+
-  xlab("Group") + ylab("% of isolates") + coord_flip() + theme_minimal(base_size = 16)
-ggsave(plot =  p, file = paste(outpath, "Isolation.pdf", sep = ""), height = 3, width = 15)
+  return(p)
+}
 
 
-Publication = metadata[which(metadata$variable == "Publication"),]
-Publication$cluster = factor(Publication$cluster, cluster_order)
-cols = c(brewer.pal(n=8, "Dark2"), brewer.pal(n = 8, "Set3"), brewer.pal(n = 8, "Set1"))
-p = ggplot(Publication, aes( x = cluster, y = count, fill = value)) +
-  geom_bar(stat = "identity", color = "black") + scale_fill_manual(values = cols)+
-  theme_bw(base_size = 16) +
-  xlab("Group") + ylab("% of isolates")
-ggsave(plot =  p, file = paste(outpath, "Publication.pdf", sep = ""), height = 3, width = 15)
+## Try to understand the proportion of isolates remaining in my dataset compared to how much there was originally
+compare_filtered_to_complete <- function(name){
+  j = which(colnames(md) == name)
+  isolation_orig = data.frame(table(md[,j]))
+  isolation_filtered = data.frame(table(md_filtered[,j]))
+  isolation_filtered = isolation_filtered[match( isolation_orig$Var1, isolation_filtered$Var1),]
+  isolation_orig = cbind(isolation_orig, filtered = isolation_filtered$Freq)
+  isolation_orig$filtered[is.na(isolation_orig$filtered)] = 0
+  isolation_orig = cbind(isolation_orig, diff = as.numeric(isolation_orig$Freq) - as.numeric(isolation_orig$filtered))
+  isolation_orig = cbind(isolation_orig, percent = isolation_orig$diff / as.numeric(isolation_orig$Freq))
+  return(isolation_orig)
+}
 
+
+path_order = c("nd", "epec", "etec","ehec","stec","expec", "eaec","epec/eaec","commensal")
+path_cols =  c("#dddddd", brewer.pal(n = 7, "Set2"), "#4c4cff")
+plot_metadata_per_cluster("Pathotype", path_order, path_cols, "")
+path_comp = compare_filtered_to_complete("Pathotype")
+
+
+iso_order = rev(c("feces","blood","urine","other/unknown"))
+iso_cols = rev( c(brewer.pal(n = 3, "Set2"),"#dddddd"))
+B= plot_metadata_per_cluster("Isolation", iso_order, iso_cols, "B")
+iso_comp = compare_filtered_to_complete("Isolation")
+
+cont_order = c("Europe", "North America","Africa","Asia","Oceania", "South America","nd")
+cont_cols = c( brewer.pal(n = 6, "Set2"), "#dddddd")
+C = plot_metadata_per_cluster("Continent", cont_order, cont_cols, "C")
+cont_comp = compare_filtered_to_complete("Continent")
+
+pub_order = data.frame(table(metadata$value[metadata$variable == "Publication"]))
+pub_order = as.character(pub_order$Var1[order(pub_order$Freq, decreasing = T)])
+pub_cols = c(brewer.pal(n=8, "Dark2"), brewer.pal(n = 8, "Set3"), brewer.pal(n = 8, "Set1"))
+plot_metadata_per_cluster("Publication", pub_order, pub_cols, "")
+pub_comp = compare_filtered_to_complete("Publication", unique(md$Publication), rainbow(n = length(unique(md$Publication))))
+
+
+
+
+#### YEAR ###
 Year = metadata[which(metadata$variable == "Year" & metadata$value != "nd"),]
 Year$cluster = factor(Year$cluster, cluster_order)
 Year$value = as.numeric(Year$value)
-cols = rep(c(brewer.pal(n = 8, "Dark2")),7)
-shapes = c(0:25, 0:25, 0:25)
-p = ggplot(Year, aes(x = value, y = count, color = cluster, shape = cluster)) + geom_point(size = 3, alpha = 0.7)+
-  scale_color_manual(values = cols) + scale_shape_manual(values = shapes) +
-  theme_bw(base_size = 16) + xlab("Year") + ylab("% of isolates")
-ggsave(plot =  p, file = paste(outpath, "Year.pdf", sep = ""), height = 5, width = 7)
+graphics = read.table("/Users/gh11/Submissions/my_thesis/Chapter3/figures/cluster_graphics.csv", sep = ",",
+                      header = T, comment.char = "")
+graphics = graphics[match(cluster_order, graphics$Cluster),]
+
+D = ggplot(Year, aes(x = value, y = count, color = cluster, shape = cluster)) + geom_point(size = 3, alpha = 0.8)+ 
+  scale_color_manual(values = as.character(graphics$Color), name = "") + scale_shape_manual(values = graphics$Shape, name = "") +
+  theme_bw(base_size = 12) + xlab("Year") + ylab("Fraction of isolates")+ theme(legend.position="None") + 
+  guides(color=guide_legend(ncol=7), shape =guide_legend(ncol = 7)) + ggtitle("D") 
+#ggsave(plot =  p, file = paste(outpath, "Year.pdf", sep = ""), height = 5, width = 7)
+D
+
+
+
+
+
+lay = rbind(c(NA,NA,NA,NA,3,3),
+            c(NA,NA,NA,NA,3,3),
+            c(1,1,1,1,1,1),
+            c(1,1,1,1,1,1),
+            c(2,2,2,2,2,2),
+            c(2,2,2,2,2,2))
+
+grid.arrange(B,C,D, layout_matrix = lay)
+## to save as an image: width = 800, height = 800
+##length(which(md$Poppunk_cluster == "2"))
+
 
 # ### Look at the metadata per cluster, stratified
 # 

@@ -34,8 +34,8 @@ X_eggnog/*.csv
 4_pairwise_roary/specific_genes/
 4_pairwise_roary/snp_trees/
 
-X_
-
+X_tree/*.txt
+X_tree/*.csv
 
 ## the virulenceFinder,RESfinder and PHASTER databases
 DBs/

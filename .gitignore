@@ -14,8 +14,11 @@ functions/
 plots/
 plasmid_summary_all.csv
 1_poppunk_running/chosen_K_11/*
+1_poppunk_running/fit_model/
+1_poppunk_running/*.csv
 2_dists_roary_analysis/all/*
 2_dists_roary_analysis/*.csv
+2_dists_roary_analysis/*/*.csv
 2_dists_roary_analysis/*.cys
 2_dists_roary_analysis/gene_presence_absences/
 2_dists_roary_analysis/orig/

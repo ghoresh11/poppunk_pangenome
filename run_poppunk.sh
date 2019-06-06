@@ -4,7 +4,7 @@ assemblies_file=assemblies.txt
 output_file=poppunk_db_parallel
 threads=16
 job_name=poppunk
-metadata_file=/lustre/scratch118/infgen/team216/gh11/e_coli_collections/FINAL_METADATA_CLEANED.csv
+metadata_file=/lustre/scratch118/infgen/team216/gh11/e_coli_collections/FILTERED_MD_FINAL_ALL.tab
 
 ## Step 1: activate the python 3 environemnt
 conda activate python36
@@ -56,23 +56,22 @@ python calculate_rand_indices.py --input $clusters
 ## 1. Extract the pairwise distances from the output files
 runjob5 python extract_distances.py --distances ${output_file}/${output_file}.dists --output ${output_file}/${output_file}.dists.out
 
+
 ### after extracting the distances, calculate how big each cluster is and what the core and accessory extract_distances
 # are within the cluster in order to run a bunch of roary jobs
 ## it should take about 10 minutes to run!
 conda activate python27
-runjob5 python calc_cluster_dists.py --clusters_file ${output_file}/${output_file}_clusters.csv --dists_file ${output_file}/${output_file}.dists.out --metadata_file ${metadata_file}
-runjob10 -o all_sizes.o -e all_sizes.e  python calc_cluster_dists.py --clusters_file ${output_file}/${output_file}_clusters.csv --dists_file ${output_file}/${output_file}.dists.out --metadata_file ${metadata_file} --out dists_analysis_all --min_cluster_size 1
+runjob5 python 1_calc_cluster_dists.py --clusters_file ${output_file}/${output_file}_clusters.csv --dists_file ${output_file}/${output_file}.dists.out --metadata_file ${metadata_file}
+runjob10 -o all_sizes.o -e all_sizes.e  1_python calc_cluster_dists.py --clusters_file ${output_file}/${output_file}_clusters.csv --dists_file ${output_file}/${output_file}.dists.out --metadata_file ${metadata_file} --out dists_analysis_all --min_cluster_size 1
 
 
 ### run roary
 python run_roary.py
 
+##post process the roary outputs by splitting some of the clusters based on the alignment length
+python run_postprocessing.py
 
-### merge the rare genes by running blast again on them with a more linient threshold
-# job_name=merge_rares
-# bsub -J ${job_name} -R"select[mem>1000] rusage[mem=1000]" -M1000  -G team216 -o ${job_name}.o -e ${job_name}.e python extract_gene_sequences.py
 
-## THis script essentially summarises all the roary outputs and generates a fasta file for all gene types
 job_name=gene_extraction
 bsub -q parallel -J ${job_name} -R"select[mem>3000] rusage[mem=3000]" -M3000  -G team216 -o ${job_name}.o -e ${job_name}.e -n16 -R"span[hosts=1]" python extract_gene_sequences.py
 

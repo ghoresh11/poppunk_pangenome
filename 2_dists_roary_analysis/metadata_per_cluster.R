@@ -141,10 +141,14 @@ graphics = graphics[match(cluster_order, graphics$Cluster),]
 
 D = ggplot(Year, aes(x = value, y = count, color = cluster, shape = cluster)) + geom_point(size = 3, alpha = 0.8)+ 
   scale_color_manual(values = as.character(graphics$Color), name = "") + scale_shape_manual(values = graphics$Shape, name = "") +
-  theme_bw(base_size = 12) + xlab("Year") + ylab("Fraction of isolates")+ theme(legend.position="None") + 
+  theme_bw(base_size = 12) + xlab("Year") + ylab("Fraction of isolates")+  
   guides(color=guide_legend(ncol=7), shape =guide_legend(ncol = 7)) + ggtitle("D") 
+
 #ggsave(plot =  p, file = paste(outpath, "Year.pdf", sep = ""), height = 5, width = 7)
-D
+
+legend = as_ggplot(get_legend(D))
+
+D = D + theme(legend.position = "None")
 
 
 

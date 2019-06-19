@@ -1,125 +1,87 @@
 import argparse
 import os
+from Bio.SeqIO.FastaIO import SimpleFastaParser
+from Bio.Seq import reverse_complement
+from Bio.Seq import translate
 from csv import reader
 import numpy as np
-import operator
-from Bio.Seq import reverse_complement
+import networkx as nx
+import subprocess
+import glob
+import string
+import random
+import shutil
 
-
-def get_gene_reps(d):
+def get_gene_reps(d, gff_jobs_file, makeblastdb, blastn, cpus, i, l):
     ''' Get a list of all the gene reps for a gene cluster
      create an empty fasta file for all the reps'''
     print("Getting gene reps...")
     cluster = d.split("/")[-1].split("_")[0]
-    reps = {}  ## genome -> rep gene -> gene cluster
+    out_presence_absence = open(os.path.join(d, "new2_gene_presence_absence.Rtab"), "w")
+    out_ref = open(os.path.join(d, "new2_pan_genome_reference.fa"), "w")
+    out_cp = open(os.path.join(d, "new2_clustered_proteins"), "w")
+    cnt = 0
+
+    reps_per_1000_genes = {} ## gene -> genomes -> all members
+    member_to_gene = {} ## member -> gene
+    curr_genomes = set() ## list of all the current genomes
+
+    tmp_out = "tmp_" + d.split("/")[-1].split("_")[0]
+    if not os.path.exists(tmp_out):
+        os.makedirs(tmp_out)
+
     with open(os.path.join(d, "gene_presence_absence.csv")) as f:
         for toks in reader(f):
             if toks[0] == "Gene":
                 rep_indexes = toks.index("Avg group size nuc") + 1
                 genomes = toks[rep_indexes:]
-                for g in genomes:
-                    reps[g] = {}
+                out_presence_absence.write("Gene\t" + "\t".join(genomes) + "\n")
                 continue
+            reps = {} ## save the representatives for this gene
             gene_name = toks[0].replace("/", "_")
+            print(gene_name)
             curr_reps = toks[rep_indexes:]
             for g in genomes:
                 for r in curr_reps:
                     if r == "":
                         continue
-                    reps[g][r] = gene_name
-    return reps, genomes
+                    if g not in reps:
+                        reps[g] = []
+                    for r2 in r.split("\t"):
+                        reps[g].append(r2) ## save all members in this genome
+                        member_to_gene[r2] = gene_name
+                    curr_genomes.add(g)
+            reps_per_1000_genes[gene_name] = reps ## points to all genomes + members
+            if len(reps_per_1000_genes) == 1000: ## don't allow more than 1000 at a time
+                sep_genes(tmp_out, genomes, gff_jobs_file, curr_genomes, member_to_gene, reps_per_1000_genes, makeblastdb, blastn, cpus, i, l,  out_presence_absence, out_ref, out_cp)
+                reps_per_1000_genes = {}
+                member_to_gene = {}
+                curr_genomes = set()
+            cnt += 1
+            # if cnt == 4:
+            #     break
+    ## don't forget final batch
+    sep_genes(tmp_out, genomes, gff_jobs_file, curr_genomes, member_to_gene, reps_per_1000_genes, makeblastdb, blastn, cpus, i, l,  out_presence_absence, out_ref, out_cp)
+    out_ref.close()
+    out_presence_absence.close()
+    out_cp.close()
+    shutil.rmtree(tmp_out)
+    return
 
 
-def gff_to_fasta(gff_files, gff_file, reps, gene_lengths):
+def get_gene_sequences(tmp_out, curr_genome, gff_file, member_to_gene, reps_per_1000_genes, gene_outs):
     '''Convert a gff file with the appended FASTA to protein/all fasta file
     gff_file = input gff file
     out_files = output files to write'''
-    curr_genome = gff_file.split("/")[-1].replace(".gff", "")
-    gff_files[curr_genome] = gff_file
-    print(curr_genome)
-    curr_reps = reps[curr_genome]
-    contigs = {}
-    with open(gff_file) as f:
-        for line in f:
-            if line.startswith("##FASTA"):
-                break
-            if line.startswith("#"):
-                continue
-            toks = line.strip().split("\t")
-            if toks[2] != "CDS":
-                continue
-            name = toks[-1].split(";")[0].replace("ID=","")
-            if name not in curr_reps: ## this CDS does not enter the roary ouput
-                continue
-            ## get the length of the gene
-            gene_length = int(toks[4]) - int(toks[3]) + 1
-
-            curr_gene = curr_reps[name]
-            if curr_gene not in gene_lengths:
-                gene_lengths[curr_gene] = {}
-            gene_lengths[curr_gene][curr_genome + "|" + name] =  gene_length
-    return
-
-def read_gffs(gff_jobs_file, gene_reps):
-    ''' get the reps from all the GFF files and add them
-    to the gene fasta'''
-    print("Getting gene sequences from GFF files...")
-    gene_lengths = {} ## keep track of the length of each rep for each gene
-    gff_files = {}
-    with open(gff_jobs_file) as f:
-        for line in f:
-            line = line.strip()
-            gff_to_fasta(gff_files, line, gene_reps, gene_lengths)
-    return gff_files, gene_lengths
-
-
-def sep_genes_by_size(gene_lengths, length_diff):
-    ''' seperate the gene clusters according to their size
-    So genes that vary by more than 0.2 in length are not in
-    the same cluster (split them into two clusters)'''
-    cc = {}
-    for gene in gene_lengths:
-        lengths_members = {}
-        for member in gene_lengths[gene]:
-            curr_length = gene_lengths[gene][member]
-            min_curr_length = curr_length - length_diff * curr_length
-            max_curr_length = curr_length + length_diff * curr_length
-            chosen_key = None
-            for l in lengths_members:
-                if min_curr_length <= l and l <= max_curr_length: ## l is within the range:
-                    lengths_members[l][member] = l
-                    chosen_key = l
-                    break
-            if chosen_key is not None:
-                ## update length to be a weighted mean of mean so far and new length
-                num_prev_members = len(lengths_members[l].keys()) - 1
-                new_length = int(np.mean([chosen_key] * num_prev_members + [curr_length]))
-                if new_length == chosen_key:
-                    continue
-                lengths_members[new_length] = lengths_members[chosen_key]
-                del lengths_members[chosen_key]
-            else:
-                lengths_members[curr_length] = {}
-                lengths_members[curr_length][member] = curr_length
-        cc[gene] = lengths_members.values()
-    return cc
-
-def get_rep_sequence(gene_id, gff_file):
-    ''' get the rep sequences from the gff file '''
-    is_contig = False
+    tmp_genome = os.path.join(tmp_out, ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(5)) + "genome.fasta")
+    out = open(tmp_genome,"w")
     fasta = False
-    contig_seq = ""
-    contig = "$$$"
+    contigs = {}
+    curr_reps = member_to_gene.keys()
     with open(gff_file) as f:
         for line in f:
-            if is_contig and line.startswith(">"):
-                break
-            if is_contig:
-                contig_seq += line.strip()
-            if line.startswith(">" + contig):
-                is_contig = True
-                continue
             if fasta:
+                out.write(line)
                 continue
             if line.startswith("##FASTA"):
                 fasta = True
@@ -130,18 +92,62 @@ def get_rep_sequence(gene_id, gff_file):
             if toks[2] != "CDS":
                 continue
             name = toks[-1].split(";")[0].replace("ID=","")
-            if name != gene_id: ## this CDS does not enter the roary ouput
+            if name not in curr_reps: ## this CDS does not match the current gene
                 continue
-            contig = toks[0]
-            start = int(toks[3]) - 1
-            stop = int(toks[4])
-            strand = toks[6]
-    seq = contig_seq[start:stop]
-    if strand == "-":
-        seq = reverse_complement(seq)
-    return seq
+            if toks[0] not in contigs:
+                contigs[toks[0]] = []
+            contigs[toks[0]].append({"name": name, "start": int(toks[3]) - 1,
+                                     "stop": int(toks[4]), "strand": toks[6]})
+    out.close()
+    with open(tmp_genome) as handle:
+        for values in SimpleFastaParser(handle):
+            curr_contig = values[0]
+            if curr_contig not in contigs:  # no CDSs in this contig
+                continue
+            for cds in contigs[curr_contig]:
+                gene = member_to_gene[cds["name"]]
+                curr_out = gene_outs[gene]
+                curr_out.write(">"+ curr_genome +"|" + cds["name"] + "\n")
+                seq = values[1][cds["start"]:cds["stop"]]
+                if cds["strand"] == "-":
+                    seq = reverse_complement(seq)
+                curr_out.write(seq + "\n")
+    os.remove(tmp_genome)
+    return
 
-def rewrite_for_gene(name, genomes, cc, gff_files, out_presence_absence, out_ref, out_cp):
+def blast_gene_cluster(tmp_out, gene_file, makeblastdb, blastn, cpus, i, l):
+    ''' Blast the rare genes of a file against each other
+    return a dictionary with rare gene -> new rep'''
+    G = nx.Graph()
+    rep_to_seq = {}
+    with open(gene_file) as handle:
+        for values in SimpleFastaParser(handle):
+            rep_to_seq[values[0]] =  values[1] ## this will provide num Ns and length
+            G.add_node(values[0])
+    if len(rep_to_seq.keys()) == 1: ## nothing to do
+        os.remove(gene_file)
+        return [rep_to_seq.keys()], rep_to_seq
+
+    tmp_blast = os.path.join(tmp_out, ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(5)) + "_gene_blast_results.tab")
+    subprocess.call([makeblastdb, "-in", gene_file, "-dbtype", "nucl"], stderr=subprocess.STDOUT)
+    subprocess.call([blastn, "-query", gene_file,
+                    "-db", gene_file, "-out", tmp_blast, "-num_threads",
+                    str(cpus), "-outfmt", "6 qseqid sseqid pident length qlen slen evalue bitscore", "-evalue", "0.01"], stderr=subprocess.STDOUT)
+    with open(tmp_blast) as f:  # add the edges to the graph
+        for line in f:
+            toks = line.strip().split()
+            identity = float(toks[2])
+            coverage = float(toks[3]) /  max(float(toks[4]), float(toks[5]))
+            if coverage > l and identity > i:
+                G.add_edge(toks[0],toks[1])
+    cc = nx.connected_components(G)
+    files_to_delete = glob.glob(gene_file + "*")
+    for f in files_to_delete:
+        os.remove(f)
+    os.remove(tmp_blast)
+    return cc, rep_to_seq
+
+def rewrite_roary_outputs(name, genomes, cc, rep_to_seq, out_presence_absence, out_ref, out_cp):
     ''' rewrite the roary outputs that matter which are:
     1. gene_presence_absence.Rtab
     2. pan_genome_reference.fasta = chooses longest rep and with least number of Ns
@@ -156,10 +162,18 @@ def rewrite_for_gene(name, genomes, cc, gff_files, out_presence_absence, out_ref
         ## write reps for new cluster in clustered proteins output
         curr_name = name + "_" + str(cnt)
         out_cp.write(curr_name + ":")
+        best_rep = {"name":"", "length":0, "Ns": 1000000, "seq":""}
         for rep in c:
             out_cp.write("\t" + rep.split("|")[1])
             curr_genomes.append(rep.split("|")[0]) ## save genomes with this gene
+            curr_seq = rep_to_seq[rep]
+            curr_Ns = curr_seq.upper().count('N')
+            ## choose the rep that has the least number of Ns and is the longest
+            if len(curr_seq) > best_rep["length"] and  curr_Ns < best_rep["Ns"]:
+                best_rep = {"name":rep, "length": len(curr_seq), "Ns": curr_Ns, "seq":curr_seq}
         out_cp.write("\n")
+        ## keep consistency of chosen rep then name of gene
+        out_ref.write(">" + best_rep["name"] + " " + curr_name  +  "\n" + best_rep["seq"] + "\n")
         ## update presence absence file
         out_presence_absence.write(curr_name)
         for g in genomes:
@@ -168,25 +182,36 @@ def rewrite_for_gene(name, genomes, cc, gff_files, out_presence_absence, out_ref
             else:
                 out_presence_absence.write("\t0")
         out_presence_absence.write("\n")
-        rep = max(c.iteritems(), key=operator.itemgetter(1))[0]
-        out_ref.write(">" + rep + " " + curr_name  +  "\n" )
-        out_ref.write(get_rep_sequence(rep.split("|")[1], gff_files[rep.split("|")[0]]) + "\n")
     return
 
+def sep_genes(tmp_out, genomes, gff_jobs_file, curr_genomes, member_to_gene, reps_per_1000_genes, makeblastdb, blastn, cpus, i, l, out_presence_absence, out_ref, out_cp):
+    ''' get the reps from all the GFF files and add them
+    to the gene fasta for a single gene '''
+    gene_outs = {}
+    gene_file_names = {}
+    for gene in reps_per_1000_genes:
+        ## open a file with dictionary for out
+        gene_file_names[gene] = os.path.join(tmp_out,''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(5)) + "_gene.fasta")
+        gene_outs[gene] = open(gene_file_names[gene], "w")
 
-def rewrite_roary_outputs(d, genomes, cc, gff_files):
-    ''' rewrite the roary outputs after splitting genes
-    by length'''
-    out_presence_absence = open(os.path.join(d, "new_gene_presence_absence.Rtab"), "w")
-    out_presence_absence.write("Gene\t" + "\t".join(genomes) + "\n")
-    out_ref = open(os.path.join(d, "new_pan_genome_reference.fa"), "w")
-    out_cp = open(os.path.join(d, "new_clustered_proteins"), "w")
-    for gene in cc:
-        rewrite_for_gene(gene, genomes, cc[gene], gff_files, out_presence_absence, out_ref, out_cp)
-    out_presence_absence.close()
-    out_ref.close()
-    out_cp.close()
+    with open(gff_jobs_file) as f:
+        for line in f:
+            gff_file = line.strip()
+            curr_genome = gff_file.split("/")[-1].replace(".gff", "")
+            print(curr_genome)
+            if curr_genome not in curr_genomes: ## this genome doesn't have this gene
+                continue
+            get_gene_sequences(tmp_out, curr_genome, gff_file, member_to_gene, reps_per_1000_genes, gene_outs)
+    ## close all the current gene files
+    for gene in gene_outs:
+        gene_outs[gene].close()
+
+    ## write the output
+    for gene in gene_file_names:
+        cc, rep_to_seq = blast_gene_cluster(tmp_out, gene_file_names[gene], makeblastdb, blastn, cpus, i, l)
+        rewrite_roary_outputs(gene, genomes, cc, rep_to_seq, out_presence_absence, out_ref, out_cp)
     return
+
 
 def classify_genes(d):
     ''' go over the Rtab file for each roary cluster,
@@ -247,10 +272,7 @@ def output_genes_per_class(d, gene_freqs):
 
 def run(args):
     # get the classification of genes to their cluster
-    gene_reps, genomes = get_gene_reps(args.d)
-    gff_files, gene_lengths = read_gffs(args.g, gene_reps)
-    cc = sep_genes_by_size(gene_lengths, args.l)
-    rewrite_roary_outputs(args.d, genomes, cc, gff_files)
+    get_gene_reps(args.d, args.g, args.makeblastdb, args.blastn, args.cpus, args.i, args.l)
     classify_genes(args.d)
     return
 
@@ -258,13 +280,25 @@ def get_options():
     parser = argparse.ArgumentParser(description='Extract the gene sequences from roary outputs, and merge rare genes')
     # input options
     parser.add_argument('--d', required=False,
-                        type=str, default =  "/lustre/scratch118/infgen/team216/gh11/e_coli_collections/poppunk/new_roary/51_1558533994",
+                        type=str, default =  "/lustre/scratch118/infgen/team216/gh11/e_coli_collections/poppunk/new_roary/48_1558538033",
                         help='path to inpqut directory [%(default)s]')
     parser.add_argument('--g', required=False,
-                            type=str, default =  "/lustre/scratch118/infgen/team216/gh11/e_coli_collections/poppunk/new_roary/new_jobs_corrected/jobs_51.txt",
+                            type=str, default =  "/lustre/scratch118/infgen/team216/gh11/e_coli_collections/poppunk/new_roary/new_jobs_corrected/jobs_48.txt",
                             help='File with the list of GFF files [%(default)s]')
+    parser.add_argument('--blastn',
+                        type=str, default = "/software/pubseq/bin/ncbi_blast+/blastn",
+                        help='blastn executable [%(default)s]')
+    parser.add_argument('--makeblastdb',
+                        type=str, default = "/software/pubseq/bin/ncbi_blast+/makeblastdb",
+                        help='makeblastdb executable [%(default)s]')
+    parser.add_argument('--cpus',
+                        type=int, default = 4,
+                        help='Number of CPUs to use [%(default)s]')
+    parser.add_argument('--i',
+                        type=float, default = 95,
+                        help='identity threshold to use for blastn [%(default)s]')
     parser.add_argument('--l',
-                        type=float, default = 0.2,
+                        type=float, default = 0.8,
                         help='length cutoff to use for sequence alignments [%(default)s]')
     return parser.parse_args()
 

@@ -110,8 +110,10 @@ variable_2_order = c("small", "not_small")
 cols = brewer.pal(n = 5, "Blues")[-1]
 
 roary_outputs = read.table("roary_summary_file.csv", sep = ",", header = T, stringsAsFactors = F)
+roary_outputs = read.table("new_summary_per_cluster.csv", sep = ",", header = T, stringsAsFactors = F)
 ## add info to the roary outputs CSV
 sizes = cluster_sizes$Size[match(roary_outputs$cluster, cluster_sizes$Cluster)]
+
 
 core_dist = within_distances$Core_median[match(roary_outputs$cluster, within_distances$Cluster)]
 core_max_dist = within_distances$Core_max[match(roary_outputs$cluster, within_distances$Cluster)]

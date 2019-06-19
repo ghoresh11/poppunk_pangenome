@@ -32,11 +32,10 @@ def get_cluster_sizes():
             sizes[toks[0]] = int(toks[1])
     return sizes
 
-
 dirs = get_input_dirs("/lustre/scratch118/infgen/team216/gh11/e_coli_collections/poppunk/new_roary/")
 sizes = get_cluster_sizes()
-## Don't forget to activate python27
-failed = [43, 49, 3, 4, 5, 6, 7, 8, 2, 1]
+
+failed = [1]
 
 for d in dirs:
     queue = "normal"
@@ -45,13 +44,14 @@ for d in dirs:
     if int(cluster) not in failed:
         continue
 
-    mem = str(sizes[cluster] * 100) ## need around 30MB per genome.. lets see!
+    mem = str(sizes[cluster] * 10) ## the number of genomes determines the size I need of memory
+                                    ## because i never run everything on more than 1000 genes at the same time
     job_name = "postprocess_" + cluster
 
     lsf_prefix = ["bsub", "-q", queue, "-J", job_name, "-G", "team216","-o", job_name + ".o",
          "-e", job_name + ".e", '-R"select[mem>' + mem + '] rusage[mem='+ mem + ']"', '-M' + mem]
 
     command = map(str,lsf_prefix + ["python", "4_post_process_roary.py",
-    "--d", dirs[d], "--gff_jobs_file",
+    "--d", dirs[d], "--g",
     "/lustre/scratch118/infgen/team216/gh11/e_coli_collections/poppunk/new_roary/new_jobs_corrected/jobs_" + cluster + ".txt"])
     subprocess.call(command)

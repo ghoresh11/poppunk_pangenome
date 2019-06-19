@@ -67,14 +67,14 @@ max(filtered_md$num_new_genes)
 df = read.table("accumilation_curves.csv", header = T, comment.char = "", sep = ",", stringsAsFactors = F)
 df = cbind(df, min= df$richness-df$sd, max = df$richness+df$sd )
 df$cluster = factor(df$cluster,cluster_sizes$Cluster)
-df = df[which(df$genomes %% 5 == 0),] ## to visualise more clearly
+df = df[which(df$genomes %% 12 == 0),] ## to visualise more clearly
 
   ggplot(df, aes(x = genomes, y = richness, color = cluster, shape = cluster))+ geom_line(alpha = 0.8)+ geom_point(size = 2, alpha = 0.8) +
   theme_bw(base_size = 12) + xlab("Genomes") +
   ylab("Genes") +
   geom_errorbar(aes(ymin=min, ymax=max), width=.2,alpha = 0.2,
                 position=position_dodge(0.05)) +
-  scale_color_manual(values = graphics$Color, guide = F) + scale_shape_manual(values = graphics$Shape) + ggtitle("B") +
+  scale_color_manual(values = graphics$Color, guide = F) + scale_shape_manual(values = graphics$Shape, guide = F) + ggtitle("B") +
     scale_x_continuous(limits = c(0,900)) 
 
 ### 

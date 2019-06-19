@@ -12,9 +12,10 @@ out_phylogroup.write("DATASET_COLORSTRIP\nSEPARATOR COMMA\nDATASET_LABEL,phylogr
 
 
 cols = sns.color_palette("Set2").as_hex()
+cols = cols + [cols[7], cols[7]]
 phylogroup_cols = {}
 index = 0
-for p in ["B2", "B1", "A", "D", "E", "C", "F", "Undefined"]:
+for p in ["B2", "B1", "A", "D", "E", "C", "F", "Undefined", "U", "U/cryptic"]:
 	phylogroup_cols[p] = cols[index]
 	index += 1
 
@@ -37,7 +38,7 @@ with open("/Users/gh11/poppunk_pangenome/X_tree/300519_chosen_with_phylogroup.cs
 	for line in f:
 		toks = line.strip().split(",")
 		if line.startswith("Name"):
-			phylogroup_index = toks.index("Phylogroup")
+			phylogroup_index = toks.index("EzClermont")
 			assembly_index = toks.index("Annotation")
 			cluster_index = toks.index("popppunk_cluster")
 			continue

@@ -16,9 +16,8 @@ import subprocess
 #          -s        dont split paralogs
 
 
-jobs_dir = "/lustre/scratch118/infgen/team216/gh11/e_coli_collections/poppunk/dists_analysis/gff_jobs"
-#jobs_dir = "/Users/gh11/poppunk_pangenome/5_roary_on_class/gff_jobs/"
-roary_out_dir = "/lustre/scratch118/infgen/team216/gh11/e_coli_collections/poppunk/pairwise_roary/"
+jobs_dir = "/lustre/scratch118/infgen/team216/gh11/e_coli_collections/poppunk/new_roary/new_jobs_corrected/"
+roary_out_dir = "/lustre/scratch118/infgen/team216/gh11/e_coli_collections/poppunk/new_roary/pairwise/"
 jobs = os.listdir(jobs_dir)
 jobs = [job_file for job_file in jobs if job_file.endswith(".txt")]
 threads = "16"
@@ -33,6 +32,9 @@ for i in range(0, num_jobs - 1):
         jobs_file_2 = jobs[j]
         cluster1 = jobs_file_1.split("_")[1].replace(".txt", "")
         cluster2 = jobs_file_2.split("_")[1].replace(".txt", "")
+
+        if int(cluster2) != 1 and int(cluster1) != 1: ## only run cluster1 against all the rest, didn't complete before...
+            continue
 
         cluster_id = cluster1 + "_" + cluster2
         gffs = []

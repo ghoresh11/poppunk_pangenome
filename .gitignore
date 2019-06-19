@@ -30,8 +30,8 @@ X_eggnog/*.csv
 
 3_gene_properties/results/
 
-4_pairwise_roary/*nodes.txt
-4_pairwise_roary/*edges.txt
+4_pairwise_roary/030519/
+4_pairwise_roary/180619/
 4_pairwise_roary/networks.cys
 4_pairwise_roary/*.csv
 4_pairwise_roary/specific_genes/

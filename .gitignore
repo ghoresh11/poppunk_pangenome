@@ -29,6 +29,7 @@ X_eggnog/*.csv
 3_gene_properties/figures/
 
 3_gene_properties/results/
+3_gene_properties/results_prev/
 
 4_pairwise_roary/030519/
 4_pairwise_roary/180619/
@@ -36,6 +37,7 @@ X_eggnog/*.csv
 4_pairwise_roary/*.csv
 4_pairwise_roary/specific_genes/
 4_pairwise_roary/snp_trees/
+4_pairwise_roary/thresholds/
 
 X_tree/*.txt
 X_tree/*.csv

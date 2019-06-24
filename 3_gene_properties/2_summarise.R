@@ -2,7 +2,7 @@ library(ggplot2)
 library(RColorBrewer)
 library(reshape2)
 
-setwd("/Users/gh11/poppunk_pangenome/3.1_gene_properties/")
+setwd("/Users/gh11/poppunk_pangenome/3_gene_properties/")
 
 variables = c("?","rare", "inter", "soft_core","core")
 files = list.files(path = "results/", full.names = T)
@@ -26,7 +26,7 @@ for (i in 2:length(files)){
   props = rbind(props,df, stringsAsFactors = F)
 }
 
-props = props[-which(is.na(props$class)),] # not sure why this still happens
+#props = props[-which(is.na(props$class)),] # not sure why this still happens
 props$class = factor(props$class, variables)
 
 ### FUNCTIONS ###
@@ -74,7 +74,7 @@ plot_size_to_genes_stratifies<- function(props, gene_type, property_column, prop
   curr_df$vals = factor(curr_df$vals, factor_vec)
   p = ggplot(curr_df, aes(x = Size, y = Freq, fill = vals)) + geom_point(size = 3, shape = 21, color = "black") +
     theme_bw(base_size = 16) + scale_fill_brewer(palette = "Reds")  + xlab("Cluster Size") +
-    ylab("Genes") + scale_x_continuous(limits = c(0, 1100)) +
+ #   ylab("Genes") + scale_x_continuous(limits = c(0, 1100)) +
     ggtitle(paste(gene_type, property, sep = "\n"))
   ggsave(plot =p,
          filename = paste(path, gene_type, "_", property, ".pdf", sep = ""), height = 4, width = 7)
@@ -116,36 +116,4 @@ for (var in c("rare", "inter", "soft_core", "core")){
   plot_size_to_genes_stratifies(props, var, column, "mean_pos", seq(from = 0.05, to = 0.6, by = 0.15), path)
   plot_size_to_genes_stratifies(props, var, column,"GC", c(0.1, 0.9), path)
 }
-
-### Connection to COG category
-cogs = read.table("../3_eggnog//cog_descs.csv", sep = ",", header = T, stringsAsFactors = F, comment.char = "")
-cogs = cogs[-which(cogs$Col == "black"),]
-props = props[-which(props$class == "?" | props$COG %in% c("A","B")),]
-props = props[which(unlist(props$COG) %in% cogs$COG),]
-cogs = cogs[-which(!cogs$COG %in% unlist(props$COG) ),] # -> if the colours are wrong some COGs need to be removed
-props$COG = unlist(as.character(props$COG))
-props$COG = factor(props$COG, levels = cogs$COG)
-
-
-labs = cogs$COG
-colors = cogs$Col
-plot_boxplot_per_prop("COG", props, "GC", "figures/", labs, "%GC", colors)
-plot_boxplot_per_prop("COG", props, "mean_length", "figures/", labs, "Gene length (log10(aa))", colors, log = T)
-plot_boxplot_per_prop("COG", props, "mean_pos", "figures/", labs, "Distance from edge (log10(bp))", colors, log = T)
-plot_boxplot_per_prop("COG", props, "mean_contig_length", "figures/",labs, "Contig length (log10(bp))", colors, log = T)
-
-
-## Is the increase in rare genes driven by any of these properties?
-column = which(colnames(props) == "COG") 
-for (cog in cogs$COG){
-  path = "figures/props_per_COG/"
-  plot_size_to_genes_stratifies(props, cog, column, "mean_length", seq(from = 0.1, to = 0.9, by = 0.2), path)
-  plot_size_to_genes_stratifies(props, cog, column,"mean_contig_length", seq(from = 0.05, to = 0.5, by = 0.1), path)
-  plot_size_to_genes_stratifies(props, cog, column, "mean_pos", seq(from = 0.05, to = 0.6, by = 0.15), path)
-  plot_size_to_genes_stratifies(props, cog, column,"GC", c(0.1, 0.9), path)
-}
-
-
-
-
 

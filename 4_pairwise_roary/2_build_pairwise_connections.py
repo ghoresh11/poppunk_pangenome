@@ -18,8 +18,9 @@ import signal
 ## relationships between all the genes
 
 
-clusters_to_remove = [21, 43, 49, 50] ## when not debugging, add more clusters here if they're weird, there is no 50
+clusters_to_remove = range(1,10) + [21, 43, 49, 50] ## when not debugging, add more clusters here if they're weird, there is no 50
 #clusters_to_remove = range(1,49) + [50] ## when debugging, will run on 24 and 39
+prefix = "new2_"
 
 def get_input_dirs(input_dir, pairwise = False):
     ''' check all directories in the input dir
@@ -28,6 +29,10 @@ def get_input_dirs(input_dir, pairwise = False):
     input_dir = os.path.abspath(input_dir)
     directories = os.listdir(input_dir)
     dirs_to_return = []
+    curr_prefix = prefix
+    if pairwise:
+        curr_prefix = ""
+
     for d in directories:
         if not os.path.isdir(os.path.join(input_dir, d)):
             continue
@@ -37,7 +42,7 @@ def get_input_dirs(input_dir, pairwise = False):
         if d.split("_")[0] in map(str, clusters_to_remove):
             continue
         ## use the post-processed outputs
-        if os.path.isfile(os.path.join(input_dir, d, "pan_genome_reference.fa")) and os.path.isfile(os.path.join(input_dir, d, "gene_presence_absence.Rtab")):
+        if os.path.isfile(os.path.join(input_dir, d, curr_prefix + "pan_genome_reference.fa")) and os.path.isfile(os.path.join(input_dir, d, curr_prefix + "gene_presence_absence.Rtab")):
             dirs_to_return.append(os.path.join(input_dir,d))
     return dirs_to_return
 
@@ -56,16 +61,17 @@ def init_network(orig_roary_dirs):
         cluster_member_gene[cluster] = {}
         cluster_gene_size[cluster] = {}
         ## get the members in each gene cluster
-        with open(os.path.join(d, "clustered_proteins")) as f:
+        with open(os.path.join(d, prefix + "clustered_proteins")) as f:
             for line in f:
                 toks = line.strip().split()
                 toks[0] = toks[0].replace(":","")
                 num_members = len(toks[1:])
                 for m in toks[1:]: ## go over all members of this cluster
+                    m = m.split("|")[1]
                     cluster_member_gene[cluster][m] = cluster + "_" + toks[0]
                 cluster_gene_size[cluster][cluster + "_" + toks[0]] = num_members
         ## get the frequency of each gene cluster and init the graph
-        with open(os.path.join(d, "gene_presence_absence.Rtab")) as f:
+        with open(os.path.join(d, prefix + "gene_presence_absence.Rtab")) as f:
             for toks in csv.reader(f, delimiter = "\t"):
                 if toks[0] == "Gene":
                     continue
@@ -82,7 +88,7 @@ def connect_two_clusters(pairwise_roary_dirs, cluster_member_gene, cluster_gene_
     that group that mapped to members in the other group'''
     print("Connecting clusters...")
     print("Calculating pairwise comparisons...")
-    for d in  pairwise_roary_dirs:
+    for d in pairwise_roary_dirs:
         clusters = d.split("/")[-1].split("_")
         cluster1 = clusters[0]
         cluster2 = clusters[1]
@@ -145,7 +151,7 @@ def read_gene_presence_absence(orig_roary_dirs):
     strains = {}
     for d in orig_roary_dirs:
         cluster = d.split("/")[-1].split("_")[0]
-        with open(os.path.join(d,  "gene_presence_absence.Rtab")) as f:
+        with open(os.path.join(d,  prefix + "gene_presence_absence.Rtab")) as f:
             for line in f:
                 toks = line.strip().split("\t")
                 if line.startswith("Gene"):
@@ -204,7 +210,7 @@ def align_clusters(G, orig_roary_dirs):
                 if d.split("/")[-1].split("_")[0] == str(curr_cluster):
                     ref_dir = d
                     break
-            with open(os.path.join(ref_dir, "pan_genome_reference.fa")) as handle:
+            with open(os.path.join(ref_dir, prefix + "pan_genome_reference.fa")) as handle:
                 for values in SimpleFastaParser(handle):
                     name = values[0].split()[1]
                     if name in members_per_cluster[curr_cluster]:

@@ -2,9 +2,7 @@ import argparse
 import os
 from Bio.SeqIO.FastaIO import SimpleFastaParser
 from Bio.Seq import reverse_complement
-from Bio.Seq import translate
 from csv import reader
-import numpy as np
 import networkx as nx
 import subprocess
 import glob
@@ -12,21 +10,21 @@ import string
 import random
 import shutil
 
-def get_gene_reps(d, gff_jobs_file, makeblastdb, blastn, cpus, i, l):
+def get_gene_reps(d, gff_jobs_file, makeblastdb, blastn, cpus, i, l, fg, lg):
     ''' Get a list of all the gene reps for a gene cluster
      create an empty fasta file for all the reps'''
     print("Getting gene reps...")
     cluster = d.split("/")[-1].split("_")[0]
-    out_presence_absence = open(os.path.join(d, "new2_gene_presence_absence.Rtab"), "w")
-    out_ref = open(os.path.join(d, "new2_pan_genome_reference.fa"), "w")
-    out_cp = open(os.path.join(d, "new2_clustered_proteins"), "w")
+    out_presence_absence = open(os.path.join(d, "new" + str(fg) + "_gene_presence_absence.Rtab"), "w")
+    out_ref = open(os.path.join(d, "new" + str(fg) + "_pan_genome_reference.fa"), "w")
+    out_cp = open(os.path.join(d, "new" + str(fg) + "_clustered_proteins"), "w")
     cnt = 0
 
     reps_per_1000_genes = {} ## gene -> genomes -> all members
     member_to_gene = {} ## member -> gene
     curr_genomes = set() ## list of all the current genomes
 
-    tmp_out = "tmp_" + d.split("/")[-1].split("_")[0]
+    tmp_out = "tmp_" + ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(5))
     if not os.path.exists(tmp_out):
         os.makedirs(tmp_out)
 
@@ -37,6 +35,11 @@ def get_gene_reps(d, gff_jobs_file, makeblastdb, blastn, cpus, i, l):
                 genomes = toks[rep_indexes:]
                 out_presence_absence.write("Gene\t" + "\t".join(genomes) + "\n")
                 continue
+            if cnt < fg:
+                cnt += 1
+                continue
+            if cnt > lg:
+                break
             reps = {} ## save the representatives for this gene
             gene_name = toks[0].replace("/", "_")
             print(gene_name)
@@ -52,15 +55,7 @@ def get_gene_reps(d, gff_jobs_file, makeblastdb, blastn, cpus, i, l):
                         member_to_gene[r2] = gene_name
                     curr_genomes.add(g)
             reps_per_1000_genes[gene_name] = reps ## points to all genomes + members
-            if len(reps_per_1000_genes) == 1000: ## don't allow more than 1000 at a time
-                sep_genes(tmp_out, genomes, gff_jobs_file, curr_genomes, member_to_gene, reps_per_1000_genes, makeblastdb, blastn, cpus, i, l,  out_presence_absence, out_ref, out_cp)
-                reps_per_1000_genes = {}
-                member_to_gene = {}
-                curr_genomes = set()
             cnt += 1
-            # if cnt == 4:
-            #     break
-    ## don't forget final batch
     sep_genes(tmp_out, genomes, gff_jobs_file, curr_genomes, member_to_gene, reps_per_1000_genes, makeblastdb, blastn, cpus, i, l,  out_presence_absence, out_ref, out_cp)
     out_ref.close()
     out_presence_absence.close()
@@ -164,7 +159,8 @@ def rewrite_roary_outputs(name, genomes, cc, rep_to_seq, out_presence_absence, o
         out_cp.write(curr_name + ":")
         best_rep = {"name":"", "length":0, "Ns": 1000000, "seq":""}
         for rep in c:
-            out_cp.write("\t" + rep.split("|")[1])
+            print("writing: " + rep)
+            out_cp.write("\t" + rep)
             curr_genomes.append(rep.split("|")[0]) ## save genomes with this gene
             curr_seq = rep_to_seq[rep]
             curr_Ns = curr_seq.upper().count('N')
@@ -176,6 +172,7 @@ def rewrite_roary_outputs(name, genomes, cc, rep_to_seq, out_presence_absence, o
         out_ref.write(">" + best_rep["name"] + " " + curr_name  +  "\n" + best_rep["seq"] + "\n")
         ## update presence absence file
         out_presence_absence.write(curr_name)
+        print(curr_genomes)
         for g in genomes:
             if g in curr_genomes:
                 out_presence_absence.write("\t1")
@@ -213,67 +210,10 @@ def sep_genes(tmp_out, genomes, gff_jobs_file, curr_genomes, member_to_gene, rep
     return
 
 
-def classify_genes(d):
-    ''' go over the Rtab file for each roary cluster,
-    calculate the frequency of each gene in the cluster
-    return: dict classification of genes into core, soft_core, intermediate, rare'''
-    print("Calculating gene frequencies....")
-    gene_class = {}
-    with open(os.path.join(d, "new_gene_presence_absence.Rtab")) as f:
-        for line in f:
-            if line.startswith("Gene"):
-                continue
-            toks = line.strip().split("\t")
-            freq = sum(map(int, toks[1:])) / float(len(toks)-1)
-            gene_class[toks[0]] = freq
-    output_genes_per_class(d, gene_class)
-    return
-
-
-def output_genes_per_class(d, gene_freqs):
-    ''' use the dictionary, and the pan_genome_reference fasta file
-    to create four different files for each cluster with the
-    sequences of the genes in each category
-    These will be used to postprocess the rare genes, and later
-    to compare between different clusters.'''
-    print("Getting the gene sequences....")
-    counts = {}
-    outputs = {}
-    types = ["core", "soft_core", "inter", "rare"]
-    for type in types:
-        outputs[type] = open(os.path.join(d, type + "_genes.fa"), "w")
-        counts[type] = 0
-    with open(os.path.join(d, "new_pan_genome_reference.fa")) as handle:
-        for values in SimpleFastaParser(handle):
-            gene_name = values[0].split()[-1]
-            protein_sequence = translate(values[1])
-            if gene_freqs[gene_name] < 0.15:
-                outputs["rare"].write(">" + values[0] + "\n" + protein_sequence + "\n")
-                counts["rare"] += 1
-            elif gene_freqs[gene_name] < 0.95:
-                outputs["inter"].write(">" + values[0] + "\n" + protein_sequence + "\n")
-                counts["inter"] += 1
-            elif gene_freqs[gene_name] < 0.99:
-                outputs["soft_core"].write(">" + values[0] + "\n" + protein_sequence + "\n")
-                counts["soft_core"] += 1
-            else:
-                outputs["core"].write(">" + values[0] + "\n" + protein_sequence + "\n")
-                counts["core"] += 1
-    for o in outputs:
-        outputs[o].close()
-
-    with open(os.path.join(d, "new_summary_statistics.txt"), "w") as out:
-        for t in types:
-            out.write(t + "\t" + str(counts[t]) + "\n")
-        out.write("Total\t" + str(sum(counts.values())) + "\n")
-    return
-
-
-
 def run(args):
     # get the classification of genes to their cluster
-    get_gene_reps(args.d, args.g, args.makeblastdb, args.blastn, args.cpus, args.i, args.l)
-    classify_genes(args.d)
+    get_gene_reps(args.d, args.g, args.makeblastdb, args.blastn, args.cpus, args.i, args.l, args.fg, args.lg)
+    #classify_genes(args.d)
     return
 
 def get_options():
@@ -295,11 +235,17 @@ def get_options():
                         type=int, default = 4,
                         help='Number of CPUs to use [%(default)s]')
     parser.add_argument('--i',
-                        type=float, default = 95,
+                        type=float, default = 90,
                         help='identity threshold to use for blastn [%(default)s]')
     parser.add_argument('--l',
-                        type=float, default = 0.8,
+                        type=float, default = 0.70,
                         help='length cutoff to use for sequence alignments [%(default)s]')
+    parser.add_argument('--fg',
+                        type=int, default = 0,
+                        help='First gene to postprocess [%(default)s]')
+    parser.add_argument('--lg',
+                        type=int, default = 10000,
+                        help='Last gene to postprocess [%(default)s]')
     return parser.parse_args()
 
 

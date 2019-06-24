@@ -35,12 +35,12 @@ out = open("new_summary_per_cluster.csv", "w")
 out.write("cluster,variable,count,size\n")
 
 for cluster in files:
-	with open(files[cluster]) as f:
-		for line in f:
-			toks = line.strip().split("\t")
-			if toks[0] == "Total":
-				continue
-			out.write(",".join([cluster,toks[0],toks[1],sizes[cluster]]) + "\n")
+    with open(files[cluster]) as f:
+        for line in f:
+            toks = line.strip().split("\t")
+            if toks[0] == "Total":
+                continue
+            out.write(",".join([cluster,toks[0],toks[1],sizes[cluster]]) + "\n")
 
 out.close()
 

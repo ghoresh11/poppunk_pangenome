@@ -113,13 +113,13 @@ roary_outputs = read.table("roary_summary_file.csv", sep = ",", header = T, stri
 roary_outputs = read.table("new_summary_per_cluster.csv", sep = ",", header = T, stringsAsFactors = F)
 ## add info to the roary outputs CSV
 sizes = cluster_sizes$Size[match(roary_outputs$cluster, cluster_sizes$Cluster)]
-
+roary_outputs = cbind(roary_outputs, size = sizes)
 
 core_dist = within_distances$Core_median[match(roary_outputs$cluster, within_distances$Cluster)]
 core_max_dist = within_distances$Core_max[match(roary_outputs$cluster, within_distances$Cluster)]
 acc_dist = within_distances$Acc_median[match(roary_outputs$cluster, within_distances$Cluster)]
 acc_max_dist = within_distances$Acc_max[match(roary_outputs$cluster, within_distances$Cluster)]
-roary_outputs = cbind(roary_outputs, sizes, core_dist, core_max_dist, acc_dist, acc_max_dist)
+roary_outputs = cbind(roary_outputs, core_dist, core_max_dist, acc_dist, acc_max_dist)
 
 
 roary_outputs = cbind(roary_outputs,
@@ -135,10 +135,10 @@ labs = c("Rare (present in fewer than <15% of isolates)", "Intermediate (present
 
 ## boxplot
 roary_outputs$variable = factor(roary_outputs$variable, rev(variable_order))
-ggplot(roary_outputs, aes(x = variable, y = count, color = length, fill = variable))+ 
+ggplot(roary_outputs, aes(x = variable, y = count, color = length, fill = variable))+
   geom_boxplot(width=0.4) +
   scale_color_manual(values = c("black", "#909090"), labels = c(">=100aa", "<100aa"), name = "Length") +
-  theme_bw(base_size = 16) + ylab("Genes") + xlab("") + 
+  theme_bw(base_size = 16) + ylab("Genes") + xlab("") +
   scale_x_discrete(labels = rev(labs)) +
   scale_fill_manual(values = rev(cols), guide = F)
 
@@ -155,7 +155,7 @@ for (i in unique(roary_outputs$cluster)){
 roary_outputs = roary_output_collapsed
 
 ## Barplot
-cluster_order = unique(roary_outputs$cluster[order(roary_outputs$sizes, decreasing = T)])
+cluster_order = unique(roary_outputs$cluster[order(roary_outputs$size, decreasing = T)])
 roary_outputs$variable = factor(roary_outputs$variable, variable_order)
 roary_outputs$cluster = factor(roary_outputs$cluster, cluster_order)
 C = ggplot(roary_outputs, aes(x = cluster, y = count, fill = variable)) + 
@@ -180,12 +180,11 @@ sd(roary_outputs$count[roary_outputs$variable == "rare"])
 
 ## connection between cluster size and number of genes from each category
 roary_outputs$variable = factor(roary_outputs$variable, variable_order)
-ggplot(roary_outputs, aes(y = count, x = sizes, fill = variable)) + 
+ggplot(roary_outputs, aes(y = count, x = size, fill = variable)) + 
   geom_point(size = 3, pch=21, color = "black", alpha = 0.7) +
   theme_bw(base_size = 16) + xlab("Cluster size") + ylab("Genes") +
   scale_fill_manual(values = cols, labels = labs)
-
-D = ggplot(roary_outputs, aes(y = count, x = sizes, fill = variable)) + 
+ggplot(roary_outputs, aes(y = count, x = size, fill = variable)) + 
   geom_point(size = 3, pch=21, color = "black", alpha = 0.7) +
   theme_bw(base_size = 12) + xlab("Cluster size") + ylab("Genes") +
   scale_fill_manual(values = cols, guide = F) +  geom_smooth(method = "gam", formula = y ~ s(log(x)), aes(color = variable)) +

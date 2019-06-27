@@ -41,7 +41,9 @@ X_eggnog/*.csv
 
 X_tree/*.txt
 X_tree/*.csv
+X_tree/300519/
 
+X_choose_reps/*.csv
 ## the virulenceFinder,RESfinder and PHASTER databases
 DBs/
 

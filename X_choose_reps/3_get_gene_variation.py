@@ -5,6 +5,9 @@ from Bio.SeqIO.FastaIO import SimpleFastaParser
 from Bio.Seq import reverse_complement
 from numpy import mean, std
 import subprocess
+import string
+import random
+
 
 def get_core_genes():
     ''' read the gene presence absence file to get a list of all the core genes'''
@@ -106,12 +109,13 @@ def create_files_per_cluster(i, core_genes, gene_members, genome_to_cluster):
 
 
 def run_msa(curr_file, between = False):
-    out_msa = open("tmp_msa_file.fa", "w")
+    tmp_msa = "tmp_" + ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(5)) + ".fa"
+    out_msa = open(tmp_msa, "w")
     p = subprocess.Popen(["mafft", "--leavegappyregion", curr_file], stdout=out_msa, stderr=subprocess.PIPE)
     p.wait()
     out_msa.close()
     msa = {}
-    with open("tmp_msa_file.fa") as handle:
+    with open(tmp_msa) as handle:
         for values in SimpleFastaParser(handle):
             msa[values[0]] = values[1]
             length = len(values[1])
@@ -126,45 +130,24 @@ def run_msa(curr_file, between = False):
     if len(mismatches) == 0:
         return None
     curr_mean = 1 - mean(mismatches)
+    os.remove(tmp_msa)
     return curr_mean
 
-def calc_variation(core_genes):
+def calc_variation(cluster, core_genes):
     ''' calculate the nucleotide variation within each cluster for each gene
     and the variation between every two clusters. Look at the difference between
     the two measures'''
-
-    out = open("variation.csv", "w")
-    out.write("Cluster1, Cluster2, Mean, SD\n")
-
     ## within variation
-    for cluster in range(1,3):
-        if cluster == 50:
+    all_means = []
+    for gene in core_genes:
+        curr_file = os.path.join(str(cluster), gene + ".fa")
+        curr_mean = run_msa(curr_file)
+        if curr_mean is None:
             continue
-        print("Calculating within cluster variation for cluster %d..." %cluster)
-        all_means = []
-        for gene in core_genes:
-            curr_file = os.path.join(str(cluster), gene + ".fa")
-            curr_mean = run_msa(curr_file)
-            if curr_mean is None:
-                continue
-            all_means.append(curr_mean)
-        out.write(",".join(map(str,[cluster, cluster, mean(all_means), std(all_means)])) + "\n")
-
-    for cluster1 in range(1,2):
-        for cluster2 in range(i+1,3):
-            all_means = []
-            for gene in core_genes:
-                filenames = [os.path.join(str(cluster1), gene + ".fa"),os.path.join(str(cluster2), gene + ".fa")]
-                with open('tmp_both', 'w') as outfile:
-                    for fname in filenames:
-                        with open(fname) as infile:
-                            outfile.write(infile.read())
-                curr_mean = run_msa(curr_file, between = True)
-                if curr_mean is None:
-                    continue
-                all_means.append(curr_mean)
-            out.write(",".join(map(str,[cluster1, cluster2, mean(all_means), std(all_means)])) + "\n")
-    out.close()
+        all_means.append(curr_mean)
+    print("Mean: %f" %mean(all_means))
+    print("SD: %f" %std(all_means))
+    print("Min: %f" %min(all_means))
     return
 
 
@@ -172,17 +155,16 @@ def run(args):
     core_genes = get_core_genes()
     gene_members = get_members_per_genome(core_genes)
     genome_to_cluster = get_cluster_members()
-    for i in range(2,3):
-        if i == 50:
-            continue
-        create_files_per_cluster(str(i), core_genes, gene_members, genome_to_cluster) # skip this if completed
-    calc_variation(core_genes)
+    #create_files_per_cluster(str(args.i), core_genes, gene_members, genome_to_cluster) # skip this if completed
+    calc_variation(args.i, core_genes)
     return
 
 def get_options():
     # need to run Roary with low cutoff to make this work on the reps I chose (60?)
     parser = argparse.ArgumentParser(
         description='Take all members of core genes, compare the variation within and between clusters to estimate identity cutoff.')
+    parser.add_argument('-i', type=int, default = 1,
+                            help='Cluster to run on [%(default)s]')
     return parser.parse_args()
 
 

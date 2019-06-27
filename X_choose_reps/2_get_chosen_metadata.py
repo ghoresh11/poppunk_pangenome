@@ -28,7 +28,7 @@ for d in dirs:
 			name = line.strip().lower().replace("_trimmed","").replace("_contigs_pacbio","").replace("_contigs_canu_1_6","").replace("_contigs_hgap_4_0","")
 			chosen[name] = d.split("/")[-1].split("_")[0]
 
-minimized_metadata = open("210619_chosen_treemer.csv","w")
+minimized_metadata = open("270619_chosen_treemer.csv","w")
 minimized_metadata.write(",".join(["Name","Assembly", "Annotation", "Reads","popppunk_cluster","ST","Year","Pathotype","Country","Continent","Isolation","Publication", "num_contigs", "length"]) + "\n")
 
 
@@ -64,7 +64,18 @@ with open("/lustre/scratch118/infgen/team216/gh11/e_coli_collections/FILTERED_MD
 		else:
 			continue
 
-		minimized_metadata.write(",".join([toks[0], toks[assembly_loc].split(",")[0], toks[gff_loc], toks[reads_loc].replace(",",";"), chosen[name], toks[st_loc], toks[year_loc],
+		assemblies = toks[assembly_loc].split(",")
+		chosen_assembly = None
+		for a in assemblies:
+			curr = a.split("/")[-1].split(".")[0]
+			if curr.lower() in name.lower() or name.lower() in curr.lower():
+				chosen_assembly = a
+
+		annot = toks[gff_loc].split("/")
+		del annot[len(annot)-2]
+		annot = "/".join(annot)
+
+		minimized_metadata.write(",".join([toks[0], chosen_assembly, annot, toks[reads_loc].replace(",",";"), chosen[name], toks[st_loc], toks[year_loc],
 		toks[pathotype_loc], toks[country_loc], toks[continent_loc], toks[isolation_loc].replace(",","-"), toks[publication_loc].replace(",","-"), toks[num_contigs_loc], toks[length_loc]]) + "\n")
 		chosen[name] = "DONE"
 

@@ -1,6 +1,6 @@
 library(ggplot2)
 library(RColorBrewer)
-
+library(reshape2)
 
 setwd("/Users/gh11/poppunk_pangenome/2_dists_roary_analysis/")
 
@@ -8,12 +8,21 @@ metadata = read.table("metadata_per_cluster.csv", sep = "\t",
                       header = T, stringsAsFactors = F, comment.char = "")
 
 cluster_order = read.table("cluster_sizes_updated.csv", sep = ",", header = T, stringsAsFactors = F)
+sizes = rep(0, dim(metadata)[1])
+for (i in 1:length(sizes)){
+  sizes[i] = cluster_order$Size[which(cluster_order$Cluster == metadata$cluster[i])]
+}
+metadata = cbind(metadata, size = sizes, orig = sizes * metadata$count)
+
+cluster_sizes = read.table("cluster_sizes_updated.csv", sep = ",", header = T, stringsAsFactors = F)
+total_count = sum(cluster_order$Size)
+
 cluster_order = cluster_order$Cluster
 clusters = unique(metadata$cluster)
 
 
-
-
+md = read.table("/Users/gh11/e_colis/UPDATED_FINAL_METADATA_CLEANED.csv",sep = "\t", header = T, stringsAsFactors = F, comment.char = "", quote = "")
+md_filtered = read.table("/Users/gh11/e_colis/FILTERED_MD_FINAL_ALL.tab",sep = "\t", header = T, stringsAsFactors = F, comment.char = "", quote = "")
 
 
 ### ST
@@ -23,7 +32,7 @@ ST = metadata[which(metadata$variable == "ST"),]
 plot_piechart_for_ST <- function(c,min, title){
   curr_df = ST[which(ST$cluster == c),]
   #return(curr_df$value[which(curr_df$count == max(curr_df$count))])
-#  curr_df$cluster = as.character(curr_df$cluster)
+  #  curr_df$cluster = as.character(curr_df$cluster)
   small = which(curr_df$count < min)
   if (length(small) > 0){
     curr_df = curr_df[-small,]
@@ -51,7 +60,7 @@ plot_piechart_for_ST <- function(c,min, title){
     scale_fill_manual(values = colors, name = "")+ theme(legend.position="bottom")  +
     guides(fill=guide_legend(nrow = 4, byrow=T)) + ggtitle(title) +
     labs(subtitle = paste("Cluster:", c))
-
+  
   return(p)
 }
 
@@ -87,7 +96,7 @@ plot_metadata_per_cluster<- function(name, order, cols, title){
     theme_classic(base_size = 12) + scale_fill_manual(values = cols, name = name)+
     xlab("Cluster") + ylab("Fraction of isolates") + scale_y_continuous(expand = c(0,0)) + ggtitle(title)+ 
     theme(axis.text.x = element_text(angle = 90, hjust = 1)) + theme(legend.position = "bottom")
-
+  
   return(p)
 }
 
@@ -105,29 +114,61 @@ compare_filtered_to_complete <- function(name){
   return(isolation_orig)
 }
 
+statistically_test <- function(name, significance = 0.05){
+  column = which(colnames(md_filtered) == name)
+  uniques = unique(metadata$value[metadata$variable == name])
+  poppunk_clusters = unique(md_filtered$Poppunk_cluster)
+  num_tests = length(uniques)*length(poppunk_clusters)
+  significance = significance / num_tests
+  res = data.frame(cluster = character(0), value = character(0), pval = numeric(0), stringsAsFactors = F)
+  for (u in uniques) {
+    for (p in poppunk_clusters){
+      all_vals = metadata[(metadata$variable == name & metadata$value == u),]
+      all_true = sum(all_vals$orig)
+      all_false = total_count - all_true
+      curr_true = all_vals$orig[all_vals$cluster == p]
+      curr_false = cluster_sizes$Size[cluster_sizes$Cluster == p] - curr_true
+      curr = matrix(data = c(all_true, all_false, curr_true, curr_false), nrow = 2, ncol = 2)
+      row.names(curr) = c("Africa", "Not Africa")
+      colnames(curr) = c("All", "34")
+      
+     # if (dim(curr)[1] != 2 || dim(curr)[2] != 2) { next }
+      test = fisher.test(curr, alternative = "less")
+      
+      if (test$p.value <= significance) {
+       res = rbind(res, 
+                   data.frame(cluster = p, value = u, pval = test$p.value, stringsAsFactors = F))
+      }
+    }
+  }
+  return(res)
+}
 
 path_order = c("nd", "epec", "etec","ehec","stec","expec", "eaec","epec/eaec","commensal")
 path_cols =  c("#dddddd", brewer.pal(n = 7, "Set2"), "#4c4cff")
 plot_metadata_per_cluster("Pathotype", path_order, path_cols, "")
 path_comp = compare_filtered_to_complete("Pathotype")
-
+path_stats = statistically_test("Pathotype")
 
 iso_order = rev(c("feces","blood","urine","other/unknown"))
 iso_cols = rev( c(brewer.pal(n = 3, "Set2"),"#dddddd"))
 B= plot_metadata_per_cluster("Isolation", iso_order, iso_cols, "B")
 iso_comp = compare_filtered_to_complete("Isolation")
+iso_stat = statistically_test("Isolation")
+
 
 cont_order = c("Europe", "North America","Africa","Asia","Oceania", "South America","nd")
 cont_cols = c( brewer.pal(n = 6, "Set2"), "#dddddd")
 C = plot_metadata_per_cluster("Continent", cont_order, cont_cols, "C")
 cont_comp = compare_filtered_to_complete("Continent")
+cont_stat = statistically_test("Continent")
 
 pub_order = data.frame(table(metadata$value[metadata$variable == "Publication"]))
 pub_order = as.character(pub_order$Var1[order(pub_order$Freq, decreasing = T)])
 pub_cols = c(brewer.pal(n=8, "Dark2"), brewer.pal(n = 8, "Set3"), brewer.pal(n = 8, "Set1"))
 plot_metadata_per_cluster("Publication", pub_order, pub_cols, "")
 pub_comp = compare_filtered_to_complete("Publication", unique(md$Publication), rainbow(n = length(unique(md$Publication))))
-
+pub_stat = statistically_test("Publication")
 
 
 

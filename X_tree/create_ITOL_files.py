@@ -34,11 +34,11 @@ with open("/Users/gh11/Submissions/my_thesis/Chapter3/figures/cluster_graphics.c
 		cluster_cols[toks[0]] = {"color": toks[2], "shape":shapes[toks[3]]}
 
 
-with open("/Users/gh11/poppunk_pangenome/X_tree/300519_chosen_with_phylogroup.csv") as f:
+with open("/Users/gh11/poppunk_pangenome/X_choose_reps/270619_chosen_treemer.csv") as f:
 	for line in f:
 		toks = line.strip().split(",")
 		if line.startswith("Name"):
-			phylogroup_index = toks.index("EzClermont")
+			phylogroup_index = toks.index("Phylogroup")
 			assembly_index = toks.index("Annotation")
 			cluster_index = toks.index("popppunk_cluster")
 			continue

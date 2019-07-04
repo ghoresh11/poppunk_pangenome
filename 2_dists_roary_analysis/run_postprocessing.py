@@ -3,7 +3,7 @@ import os
 import subprocess
 
 
-MAX_GENES = 500
+MAX_GENES = 15
 
 def get_input_dirs(input_dir):
     ''' check all directories in the input dir
@@ -50,32 +50,28 @@ sizes = get_cluster_sizes()
 num_genes = get_num_genes(dirs)
 
 
-failed = range(1,10)
-# failed = [9]
-## split the pipeline so it works on 5000 genes at a time?
-## failed = range(11,51)
+failed = [1]
+
 for d in dirs:
     queue = "normal"
     cluster = d.split("/")[-1].split("_")[0]
-
+    mem = "1000"
     if int(cluster) not in failed: ##change to 'in'
         continue
 
-    mem = str(sizes[cluster] * 20) ## the number of genomes determines the size I need of memory
-                                    ## because i never run everything on more than 1000 genes at the same time
-    for i in range(0,num_genes[d],MAX_GENES):
+    for i in range(15, num_genes[d], MAX_GENES):
+    #for i in range(0, failed[int(cluster)], MAX_GENES): ## only carry on until the number of genes that failed
         first = i
         last = i + MAX_GENES - 1
-        if last > num_genes:
-            last = num_genes
+        if last > num_genes[d]:
+            last = num_genes[d]
 
-        job_name = "postprocess_" + str(i) + "_" + cluster
-
+        job_name = "postprocess_" + cluster + "_" + str(i)
+        print(job_name)
         lsf_prefix = ["bsub", "-q", queue, "-J", job_name, "-G", "team216","-o", job_name + ".o",
              "-e", job_name + ".e", '-R"select[mem>' + mem + '] rusage[mem='+ mem + ']"', '-M' + mem]
 
         command = map(str,lsf_prefix + ["python", "4_post_process_roary.py",
-        "--d", dirs[d], "--g",
-        "/lustre/scratch118/infgen/team216/gh11/e_coli_collections/poppunk/new_roary/new_jobs_corrected/jobs_" + cluster + ".txt",
+        "--d", dirs[d],
         "--fg", str(first), "--lg", str(last)])
         subprocess.call(command)

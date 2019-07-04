@@ -43,7 +43,7 @@ def get_cluster_members():
     ''' assign each GFF file to a cluster '''
     print("Getting cluster and assembly info for all genomes...")
     genome_to_cluster = {}
-    with open("300519_chosen.csv") as f:
+    with open("270619_chosen_treemer.csv") as f:
         for line in f:
             toks = line.strip().split(',')
             if line.startswith("Name"):
@@ -52,7 +52,7 @@ def get_cluster_members():
                 cluster = toks.index("popppunk_cluster")
                 continue
             annot_path = toks[annot].split("/")
-            del annot_path[len(annot_path) - 2]
+            #del annot_path[len(annot_path) - 2]
             annot_path = "/".join(annot_path)
             genome_to_cluster[toks[annot].split("/")[-1]] = {"cluster":toks[cluster], "assembly" : toks[assembly], "annot":annot_path}
     return genome_to_cluster
@@ -111,7 +111,7 @@ def create_files_per_cluster(i, core_genes, gene_members, genome_to_cluster):
 def run_msa(curr_file, between = False):
     tmp_msa = "tmp_" + ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(5)) + ".fa"
     out_msa = open(tmp_msa, "w")
-    p = subprocess.Popen(["mafft", "--leavegappyregion", curr_file], stdout=out_msa, stderr=subprocess.PIPE)
+    p = subprocess.Popen(["mafft", curr_file], stdout=out_msa, stderr=subprocess.PIPE)
     p.wait()
     out_msa.close()
     msa = {}
@@ -155,7 +155,7 @@ def run(args):
     core_genes = get_core_genes()
     gene_members = get_members_per_genome(core_genes)
     genome_to_cluster = get_cluster_members()
-    #create_files_per_cluster(str(args.i), core_genes, gene_members, genome_to_cluster) # skip this if completed
+    create_files_per_cluster(str(args.i), core_genes, gene_members, genome_to_cluster) # skip this if completed
     calc_variation(args.i, core_genes)
     return
 

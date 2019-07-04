@@ -6,7 +6,9 @@ output_files = os.listdir(".")
 
 print("Cluster1,Cluster2,Mean,SD,Min")
 
-for f in files:
+for f in output_files:
+    if not f.endswith(".o"):
+        continue
     toks = f.split("_")
     if len(toks) == 2:
         cluster1 = toks[0]
@@ -15,7 +17,10 @@ for f in files:
         cluster1 = toks[0]
         cluster2 = toks[1]
     with open(f) as f_open:
-        for line in f:
+        min = "NA"
+        mean = "NA"
+        sd = "NA"
+        for line in f_open:
             if "Mean:" in line:
                 mean = line.strip().split()[-1]
                 continue

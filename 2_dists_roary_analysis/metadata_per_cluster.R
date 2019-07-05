@@ -70,6 +70,7 @@ pie3 = plot_piechart_for_ST(3, 0.0025, "G")
 pie4 = plot_piechart_for_ST(17, 0.0025, "H")
 pie5 = plot_piechart_for_ST(40, 0.0025, "I")
 
+plot_piechart_for_ST(12, 0.001, "hi")
 ### TO make a file of the most common ST in each cluster (can also look at the porportion)
 # df = data.frame(i = 1:51, ans = rep("", 51), stringsAsFactors = F)
 # for (i in 1:51){
@@ -186,14 +187,25 @@ D = ggplot(Year, aes(x = value, y = count, color = cluster, shape = cluster)) + 
   guides(color=guide_legend(ncol=7), shape =guide_legend(ncol = 7)) + ggtitle("D") 
 
 #ggsave(plot =  p, file = paste(outpath, "Year.pdf", sep = ""), height = 5, width = 7)
-
+D
 legend = as_ggplot(get_legend(D))
 
 D = D + theme(legend.position = "None")
 
+all_years = Year$value
+year_stat = data.frame(cluster = unique(Year$cluster), pval = rep(0, length(unique(Year$cluster))), stringsAsFactors = F)
+signif = 0.05 / dim(year_stat)[1]
+for (i in 1:dim(year_stat)[1]){
+  curr_cluster = year_stat$cluster[i]
+  years_of_cluser = Year$value[Year$cluster == curr_cluster]
+  pval = wilcox.test(all_years, years_of_cluser)$p.value
+  year_stat$pval[i] = pval
+}
+year_stat = year_stat[which(year_stat$pval < 0.05),]
 
-
-
+plot(hist(all_years))
+plot(hist(years_of_cluser))
+wilcox.test(all_years, years_of_cluser)
 
 lay = rbind(c(NA,NA,NA,NA,3,3),
             c(NA,NA,NA,NA,3,3),

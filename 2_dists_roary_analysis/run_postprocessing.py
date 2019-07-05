@@ -3,7 +3,7 @@ import os
 import subprocess
 
 
-MAX_GENES = 15
+MAX_GENES = 30
 
 def get_input_dirs(input_dir):
     ''' check all directories in the input dir
@@ -55,23 +55,27 @@ failed = [1]
 for d in dirs:
     queue = "normal"
     cluster = d.split("/")[-1].split("_")[0]
-    mem = "1000"
+
     if int(cluster) not in failed: ##change to 'in'
         continue
 
-    for i in range(15, num_genes[d], MAX_GENES):
+    for i in range(30, num_genes[d], MAX_GENES):
     #for i in range(0, failed[int(cluster)], MAX_GENES): ## only carry on until the number of genes that failed
         first = i
         last = i + MAX_GENES - 1
         if last > num_genes[d]:
             last = num_genes[d]
 
+        mem = "1000"
+        if i < 4800:
+            mem = "2500"
+
         job_name = "postprocess_" + cluster + "_" + str(i)
         print(job_name)
         lsf_prefix = ["bsub", "-q", queue, "-J", job_name, "-G", "team216","-o", job_name + ".o",
              "-e", job_name + ".e", '-R"select[mem>' + mem + '] rusage[mem='+ mem + ']"', '-M' + mem]
 
-        command = map(str,lsf_prefix + ["python", "4_post_process_roary.py",
+        command = map(str, lsf_prefix + ["python", "4_post_process_roary.py",
         "--d", dirs[d],
         "--fg", str(first), "--lg", str(last)])
         subprocess.call(command)

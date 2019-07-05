@@ -69,12 +69,14 @@ def get_gene_sequences(tmp_out, curr_genome, gff_file, fasta_file, member_to_gen
     '''Convert a gff file with the appended FASTA to protein/all fasta file
     gff_file = input gff file
     out_files = output files to write'''
-    db = gffutils.create_db(gff_file, dbfn=gff_file + '.db', force=True)
+    r = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(10))
+    db = gffutils.create_db(gff_file, dbfn= r + '.db', force=True)
     curr_members = reps_per_genome[curr_genome]
     for member in curr_members:
         seq = db[member].sequence(fasta_file)
         curr_out = gene_outs[member_to_gene[member]]
         curr_out.write(">"+ curr_genome +"|" + member + "\n" + seq + "\n")
+    os.remove(r + '.db')
     return
 
 

@@ -85,8 +85,8 @@ def get_cluster_sizes():
 
 def run(args):
     dirs = get_input_dirs(args.d)
-    for input_dir in dirs:
-        classify_genes(input_dir)
+    # for input_dir in dirs:
+    #     classify_genes(input_dir)
     sizes = get_cluster_sizes()
 
     out = open("FINAL_summary_per_cluster.csv", "w")
@@ -94,7 +94,7 @@ def run(args):
 
     for input_dir in dirs:
         cluster = input_dir.split("/")[-1].split("_")[0]
-        with open(os.path.join(files[cluster], "summary_statistics")) as f:
+        with open(os.path.join(input_dir, "summary_statistics.txt")) as f:
             for line in f:
                 toks = line.strip().split("\t")
                 if toks[0] == "Total genes":

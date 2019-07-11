@@ -196,7 +196,7 @@ all_years = Year$value
 year_stat = data.frame(cluster = unique(Year$cluster), pval = rep(0, length(unique(Year$cluster))), stringsAsFactors = F)
 signif = 0.05 / dim(year_stat)[1]
 for (i in 1:dim(year_stat)[1]){
-  curr_cluster = year_stat$cluster[i]
+  curr_cluster = year_stat$clusteruster[i]
   years_of_cluser = Year$value[Year$cluster == curr_cluster]
   pval = wilcox.test(all_years, years_of_cluser)$p.value
   year_stat$pval[i] = pval

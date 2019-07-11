@@ -52,8 +52,25 @@ num_genes = get_num_genes(dirs)
 
 failed = [1]
 
+failed_logs = os.listdir("1_failed/")
+mem_failed = []
+time_failed = []
+for f in failed_logs:
+    if not f.endswith(".o"):
+        continue
+    num = int(f.split("_")[-1].replace(".o",""))
+    with open("1_failed/" + f) as f_open:
+        for line in f_open:
+            if "LSF memory usage limit" in line:
+                mem_failed.append(num)
+                continue
+            if "run time limit" in line:
+                time_failed.append(num)
+
+print("Memory failed: %s (%d)\nTime failed: %s (%d)" %(str(mem_failed), len(mem_failed),str(time_failed),  len(time_failed)))
+
 for d in dirs:
-    queue = "normal"
+
     cluster = d.split("/")[-1].split("_")[0]
 
     if int(cluster) not in failed: ##change to 'in'
@@ -61,19 +78,29 @@ for d in dirs:
 
     for i in range(30, num_genes[d], MAX_GENES):
     #for i in range(0, failed[int(cluster)], MAX_GENES): ## only carry on until the number of genes that failed
+        if i not in mem_failed + time_failed:
+            continue
+
         first = i
         last = i + MAX_GENES - 1
         if last > num_genes[d]:
             last = num_genes[d]
 
+        queue = "long"
         mem = "1000"
         if i < 4800:
             mem = "2500"
 
+        if i in mem_failed:
+            mem = "8000"
+
+        if i in time_failed:
+            queue = "long"
+
         job_name = "postprocess_" + cluster + "_" + str(i)
         print(job_name)
         lsf_prefix = ["bsub", "-q", queue, "-J", job_name, "-G", "team216","-o", job_name + ".o",
-             "-e", job_name + ".e", '-R"select[mem>' + mem + '] rusage[mem='+ mem + ']"', '-M' + mem]
+             "-e", job_name + ".e",  '-R"select[mem>' + mem + '] rusage[mem='+ mem + '] span[hosts=1]"', '-M' + mem, "-n" + "3"]
 
         command = map(str, lsf_prefix + ["python", "4_post_process_roary.py",
         "--d", dirs[d],

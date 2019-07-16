@@ -3,58 +3,8 @@ import subprocess
 import networkx as nx
 import argparse
 import operator
-
-def run_cdhit(pan_ref_a, pan_ref_b, name_a, name_b, t, a, removed, geneid_to_graphid):
-    ''' merge the two pan reference genome files and run cdhit
-    to get new clusters
-    return: path to cdhit output'''
-    out_ref_tmp = 'tmp_pan_genome_reference'
-    cdhit_out_tmp = 'tmp_cdhit_out'
-    cnt = 0
-    with open(out_ref_tmp, 'w') as outfile:
-        for fname in [pan_ref_a, pan_ref_b]:
-            curr = name_a if fname == pan_ref_a else name_b
-            with open(fname) as infile:
-                for line in infile:
-                    if line.startswith(">"):
-                        line = line.strip().replace(">", curr + "|")
-                        if geneid_to_graphid[line] in removed:
-                            ident = None
-                        else:
-                            ident = ">" + line
-                        continue
-                    if ident is None:
-                        continue
-                    if ";" in line:
-                        toks = line.strip().split(";")
-                        seq = toks[0]
-                        outfile.write(ident + "\n" + toks[0] + "\n")
-                    else:
-                        outfile.write(ident + "\n" + line)
-                    cnt += 1
-    # -n 10, 11 for thresholds 0.95 ~ 1.0
-    # -n 8,9    for thresholds 0.90 ~ 0.95
-    # -n 7      for thresholds 0.88 ~ 0.9
-    # -n 6      for thresholds 0.85 ~ 0.88
-    # -n 5      for thresholds 0.80 ~ 0.85
-    # -n 4      for thresholds 0.75 ~ 0.8
-    if t > 0.95:
-        n = 10
-    elif t > 0.9:
-        n = 8
-    elif t > 0.88:
-        n = 7
-    elif t > 0.85:
-        n = 6
-    elif t > 0.8:
-        n = 5
-    else:
-        n = 4
-
-    subprocess.call(["cd-hit-est", "-i", out_ref_tmp, "-o", cdhit_out_tmp,
-                     "-c", str(t), "-T", "4", "-d", "0", "-A", str(a), "-n", str(n)])
-    os.remove(out_ref_tmp)
-    return cdhit_out_tmp
+import sys
+from Bio.SeqIO.FastaIO import SimpleFastaParser
 
 
 def read_graphs(graph_a, graph_b, name_a, name_b):
@@ -81,22 +31,84 @@ def read_graphs(graph_a, graph_b, name_a, name_b):
         graphid_to_geneid[n[0]] = n[1]["cluster"] + "|" + n[1]["centroid"]
     return G, geneid_to_graphid, graphid_to_geneid
 
+def get_cluster_size(gene_presence_absence_file):
+    ''' get the size of each cluster to define the minimum weight of an
+    edge to use'''
+    with open(gene_presence_absence_file) as f:
+        for line in f:
+            toks = line.strip().split(",")
+            index = toks.index("Avg group size nuc")
+            return len(toks[index+1:])
+    sys.exit("Error: not supposed to have reached this point! Check gene presence absence files!")
+    return
 
-def add_edge_to_network(curr_members, match_graph, geneid_to_graphid, removed):
+
+def run_cdhit(pan_ref_a, pan_ref_b, name_a, name_b, t, a, removed, geneid_to_graphid):
+    ''' merge the two pan reference genome files and run cdhit
+    to get new clusters
+    return: path to cdhit output'''
+    out_ref_tmp = name_a + "_" + name_b + '_pan_genome_reference'
+    cdhit_out_tmp = name_a + "_" + name_b + '_cdhit_out'
+    cnt = 0
+    with open(out_ref_tmp, 'w') as outfile:
+        for fname in [pan_ref_a, pan_ref_b]:
+            curr = name_a if fname == pan_ref_a else name_b
+            with open(fname) as handle:
+                for values in SimpleFastaParser(handle):
+                    ident = curr + "|" + values[0]
+                    if geneid_to_graphid[ident] in removed:
+                        continue
+                    seq = values[1]
+                    if ";" in seq:
+                        seq = seq.split(";")[0]
+                    outfile.write(">" + ident + "\n" + seq + "\n")
+                    cnt += 1
+    # -n 10, 11 for thresholds 0.95 ~ 1.0
+    # -n 8,9    for thresholds 0.90 ~ 0.95
+    # -n 7      for thresholds 0.88 ~ 0.9
+    # -n 6      for thresholds 0.85 ~ 0.88
+    # -n 5      for thresholds 0.80 ~ 0.85
+    # -n 4      for thresholds 0.75 ~ 0.8
+    if t > 0.95:
+        n = 10
+    elif t > 0.9:
+        n = 8
+    elif t > 0.88:
+        n = 7
+    elif t > 0.85:
+        n = 6
+    elif t > 0.8:
+        n = 5
+    else:
+        n = 4
+
+    subprocess.call(["cd-hit-est", "-i", out_ref_tmp, "-o", cdhit_out_tmp,
+                     "-c", str(t), "-T", "4", "-d", "0", "-A", str(a), "-n", str(n)])
+    os.remove(out_ref_tmp)
+    print("Num sequences in the fasta file: %d" %cnt)
+    return cdhit_out_tmp
+
+def init_network(geneid_to_graphid, removed):
+    ''' init the match network'''
+    match_graph = nx.Graph()
+    for gene in geneid_to_graphid:
+        if geneid_to_graphid[gene] in removed:
+            continue
+        match_graph.add_node(
+            geneid_to_graphid[gene], cluster=gene.split("|")[0])
+    return match_graph
+
+
+def add_edge_to_network(curr_members, match_graph, geneid_to_graphid):
     ''' add an edge to the merged network'''
     keys = list(curr_members.keys())
     for i in range(0, len(keys) - 1):
         for j in range(i + 1, len(keys)):
             first = keys[i]
             second = keys[j]
-            if geneid_to_graphid[first] in removed or geneid_to_graphid[second] in removed:
+            if geneid_to_graphid[first] not in match_graph or geneid_to_graphid[second] not in match_graph:
                 continue
-            # only if from different clusters (a/b)
             if curr_members[first] != curr_members[second]:
-                match_graph.add_node(
-                    geneid_to_graphid[first], cluster=curr_members[first])
-                match_graph.add_node(
-                    geneid_to_graphid[second], cluster=curr_members[second])
                 match_graph.add_edge(
                     geneid_to_graphid[first], geneid_to_graphid[second])
     return match_graph
@@ -107,13 +119,15 @@ def build_match_network(geneid_to_graphid, cdhit_out, removed):
     clusters A and B based on the cdhit output
     return: the matched network'''
     print("Building the match graph from cdhit...")
-    match_graph = nx.Graph()
+    match_graph = init_network(geneid_to_graphid, removed)
+    num_members = 0
     with open(cdhit_out + ".clstr") as f:
         curr_members = {}
         for line in f:
             if line.startswith(">"):
                 match_graph = add_edge_to_network(
-                    curr_members, match_graph, geneid_to_graphid, removed)
+                    curr_members, match_graph, geneid_to_graphid)
+                num_members += len(curr_members)
                 curr_members = {}
                 continue
             member = line.strip().split("...")[0].split(">")[-1]
@@ -121,7 +135,8 @@ def build_match_network(geneid_to_graphid, cdhit_out, removed):
             curr_members[member] = cluster
     # don't forget the last one
     match_graph = add_edge_to_network(
-        curr_members, match_graph, geneid_to_graphid, removed)
+        curr_members, match_graph, geneid_to_graphid)
+    num_members += len(curr_members)
     os.remove(cdhit_out)
     os.remove(cdhit_out + ".clstr")
     return match_graph
@@ -141,7 +156,7 @@ def sort_neighbours_by_weight(G, source):
     return sorted_neighbours
 
 
-def rec_connect_neighbours(chosen, friend, match_graph, G, removed, threshold, a, rec_cnt, min_weight=10):
+def rec_connect_neighbours(chosen, friend, match_graph, G, removed, threshold, a, min_weights):
     ''' recursively go over the neighbours and find if they
     have a match to each other, in that case we would trust
     they should be together
@@ -149,15 +164,15 @@ def rec_connect_neighbours(chosen, friend, match_graph, G, removed, threshold, a
     threshold'''
     chosen_neighbours = sort_neighbours_by_weight(G, chosen)
     friend_neighbours = sort_neighbours_by_weight(G, friend)
-    print("Going over neighbours of: %s+%s" % (chosen, friend))
+    #print("Going over neighbours of: %s+%s" % (chosen, friend))
 
     for i in chosen_neighbours:  # over here - when you choose the neighbour choose the best one of chosen
         # already added as a match
-        if G.edges[(chosen, i)]['weight'] < min_weight or G.edges[(chosen, i)]['weight'] > 8880:
+        if G.edges[(chosen, i)]['weight'] < min_weights[G.nodes(data=True)[chosen]['cluster']] or G.edges[(chosen, i)]['weight'] > 8880:
             continue
         for j in friend_neighbours:
             # already added as a ,atch
-            if G.edges[(friend, j)]['weight'] < min_weight or G.edges[(friend, j)]['weight'] > 8880:
+            if G.edges[(friend, j)]['weight'] < min_weights[G.nodes(data=True)[friend]['cluster']] or G.edges[(friend, j)]['weight'] > 8880:
                 continue
             if match_graph.has_edge(i, j):
                 G.add_edge(i, j, weight=8888, ident=threshold,
@@ -167,7 +182,7 @@ def rec_connect_neighbours(chosen, friend, match_graph, G, removed, threshold, a
                 removed.append(i)
                 removed.append(j)
                 G, match_graph, removed = rec_connect_neighbours(
-                    i, j, match_graph, G, removed, threshold, a, rec_cnt + 1)
+                    i, j, match_graph, G, removed, threshold, a, min_weights)
     return G, match_graph, removed
 
 
@@ -182,9 +197,9 @@ def choose_nodes(match_graph):
     return None, None
 
 
-def remove_degree_1(chosen, friend, G, match_graph, removed, threshold, a):
+def remove_degree_1(chosen, friend, G, match_graph, removed, threshold, a, min_weights):
     # step 1 find a node with degree 1
-    print("Chosen: %s+%s" % (chosen, friend))
+    #print("Chosen: %s+%s" % (chosen, friend))
     G.add_edge(chosen, friend, weight=9999,
                ident=threshold, coverage=a)  # by degree
     match_graph.remove_node(friend)
@@ -192,7 +207,7 @@ def remove_degree_1(chosen, friend, G, match_graph, removed, threshold, a):
     removed.append(friend)
     removed.append(chosen)
     G, match_graph, removed = rec_connect_neighbours(
-        chosen, friend, match_graph, G, removed, threshold, a, 0)
+        chosen, friend, match_graph, G, removed, threshold, a, min_weights)
     return G, match_graph, removed
 
 
@@ -231,6 +246,7 @@ def correct_non_1_degree(G, match_graph, name_a, name_b):
                 if score == 0:  # remove edges that have no neighbour support
                     match_graph.remove_edge(node_a, node_b)
                     has_removed = True
+    nx.write_gml(match_graph, path = "final_match_graph.gml")
     return has_removed, match_graph
 
 
@@ -252,8 +268,10 @@ def create_merged_output(G, match_graph, name_a, name_b):
                                      m]['cluster'] + "_" + G.nodes[m]['name'])
                 written.append(m)
         out.write("\t".join(members_genes) + "\n")
-        if len(members_genes) > 1:
+        if len(members_genes) > 2:
             one_to_many += 1
+        elif len(members_genes) == 2:
+            one_to_one += 1
         else:
             singletons += 1
 
@@ -286,9 +304,13 @@ def run(args):
         args.a, "final_graph.gml"), os.path.join(args.b, "final_graph.gml"),
         args.name_a, args.name_b)
     removed = []
-    # for alignment_coverage in [0.99, 0.95, 0.9, 0.85, 0.8, 0.75]:
-    for alignment_coverage in [0.9]:
+    size_a = get_cluster_size(os.path.join(args.a, "gene_presence_absence.csv"))
+    size_b = get_cluster_size(os.path.join(args.b, "gene_presence_absence.csv"))
+    min_weights = {args.name_a: size_a * 0.1, args.name_b: size_b * 0.1}
+    for alignment_coverage in [0.99, 0.95, 0.9, 0.85, 0.8, 0.75]:
+    #for alignment_coverage in [0.9]:
         for threshold in [0.99, 0.95, 0.9, 0.85, 0.8]:
+        #for threshold in [0.95, 0.9]:
             print("Running cdhit with threshold %f..." % threshold)
             cdhit_out = run_cdhit(os.path.join(args.a, "pan_genome_reference.fa"), os.path.join(
                 args.b, "pan_genome_reference.fa"), args.name_a, args.name_b, threshold, alignment_coverage, removed, geneid_to_graphid)
@@ -299,15 +321,26 @@ def run(args):
                 chosen, friend = choose_nodes(match_graph)
                 while chosen is not None:
                     G, match_graph, removed = remove_degree_1(
-                        chosen, friend, G, match_graph, removed, threshold, alignment_coverage)
+                        chosen, friend, G, match_graph, removed, threshold, alignment_coverage, min_weights)
                     chosen, friend = choose_nodes(match_graph)
                 has_removed, match_graph = correct_non_1_degree(G, match_graph, args.name_a, args.name_b)
-            nx.write_gml(match_graph, path="A" + str(alignment_coverage)
-                         + "_I" + str(threshold) + "_remaining_graph.gml")
+
+    ## run final time to make sure to add things that couldn't be fixed (or maybe new ones to ones comeup)
+    print("Summarising non one-to-one matches left")
+    print("coverage: %f, threshold = %f" %(alignment_coverage, threshold))
+    cdhit_out = run_cdhit(os.path.join(args.a, "pan_genome_reference.fa"), os.path.join(
+        args.b, "pan_genome_reference.fa"), args.name_a, args.name_b, threshold, alignment_coverage, removed, geneid_to_graphid)
+    match_graph = build_match_network(geneid_to_graphid, cdhit_out, removed)
+    ## to print the remaining network that has more than degree 1:
+    nx.write_gml(match_graph, path= args.name_a + "_" + args.name_b + "_remaining_graph.gml")
+
+
     print("Writing merged graph to file...")
-    nx.write_gml(G, path="final_graph_merged.gml")
+    nx.write_gml(G, path=args.name_a + "_" + args.name_b + "_graph_merged.gml")
     create_merged_output(G, match_graph, args.name_a, args.name_b)
     ## possible fix: reconnect to genes if makes sense from graph that they should be connected?
+    ## I'm not going to apply the fix because I'm going to repeat this many times
+    ## so will have a level of confidence when two genes should be in the same group
     return
 
 

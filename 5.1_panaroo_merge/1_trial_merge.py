@@ -246,7 +246,6 @@ def correct_non_1_degree(G, match_graph, name_a, name_b):
                 if score == 0:  # remove edges that have no neighbour support
                     match_graph.remove_edge(node_a, node_b)
                     has_removed = True
-    nx.write_gml(match_graph, path = "final_match_graph.gml")
     return has_removed, match_graph
 
 
@@ -303,6 +302,7 @@ def run(args):
     G, geneid_to_graphid, graphid_to_geneid = read_graphs(os.path.join(
         args.a, "final_graph.gml"), os.path.join(args.b, "final_graph.gml"),
         args.name_a, args.name_b)
+    
     removed = []
     size_a = get_cluster_size(os.path.join(args.a, "gene_presence_absence.csv"))
     size_b = get_cluster_size(os.path.join(args.b, "gene_presence_absence.csv"))
@@ -359,7 +359,7 @@ def get_options():
                         help='name to use for cluster a [%(default)s]')
     parser.add_argument('--name_b', required=False,
                         type=str, default="40",
-                        help='name to use for cluster a [%(default)s]')
+                        help='name to use for cluster b [%(default)s]')
     return parser.parse_args()
 
 

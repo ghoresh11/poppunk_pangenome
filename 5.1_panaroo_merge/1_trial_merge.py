@@ -302,7 +302,7 @@ def run(args):
     G, geneid_to_graphid, graphid_to_geneid = read_graphs(os.path.join(
         args.a, "final_graph.gml"), os.path.join(args.b, "final_graph.gml"),
         args.name_a, args.name_b)
-    
+
     removed = []
     size_a = get_cluster_size(os.path.join(args.a, "gene_presence_absence.csv"))
     size_b = get_cluster_size(os.path.join(args.b, "gene_presence_absence.csv"))

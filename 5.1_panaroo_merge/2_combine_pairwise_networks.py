@@ -116,14 +116,16 @@ def read_gene_presence_absence(orig_roary_dirs):
                 gene_presence_absence[cluster + "_" + toks[0]] = map(int,toks[1:])
     return strains, gene_presence_absence
 
-def split_cluster(H):
+def split_cluster(name, H):
     ''' use dbscan to split connected components that don't make sense
     because of spurious matches
     When looking at the plots it's clear that there is structure in these structures
     and that sometimes the merge step incorrectly marks two genes as the same'''
     if len(H) > 500: ## can't deal with such a large network...
-        return list(H.nodes())
-    H = nx.convert_node_labels_to_integers(H, label_attribute = "orig_name")
+        return [list(H.nodes())]
+    if len(H) < 50: ## I'll assume these aren't the problem for now
+        return [list(H.nodes())]
+    H = nx.convert_node_labels_to_integers(H, label_attribute = "origname")
     edges = zip(*nx.to_edgelist(H))
     H1 = igraph.Graph(len(H), zip(*edges[:2]))
     X = 1 - np.array(H1.similarity_jaccard(loops=False))
@@ -135,9 +137,11 @@ def split_cluster(H):
     nodes = list(H.nodes())
     for i in range(0, len(labels)):
         label_per_node[nodes[i]] = labels[i]
-        if labels[i] != -1 and labels[i] not in members_to_return:
+        if labels[i] == -1:
+            continue
+        if labels[i] not in members_to_return:
             members_to_return[labels[i]] = []
-        members_to_return[labels[i]].append(H.nodes(data=True)[nodes[i]]["orig_name"])
+        members_to_return[labels[i]].append(H.nodes(data=True)[nodes[i]]["origname"])
 
     nx.set_node_attributes(H, label_per_node, 'dbscan')
 
@@ -150,9 +154,26 @@ def split_cluster(H):
         for k in curr_neighbours:
             neighbour_clusters.append(H.nodes[k]['dbscan'])
         curr_cluster = max(set(neighbour_clusters), key = neighbour_clusters.count)
-        members_to_return[curr_cluster].append(n["orig_name"])
-    return members_to_return
+        if curr_cluster == -1: ## really is noise, it's own cluster
+            members_to_return[n[1]["origname"]] = [n[1]["origname"]]
+        else:
+            members_to_return[curr_cluster].append(n[1]["origname"])
+        n[1]["dbscan"] = curr_cluster
 
+    nx.write_gml(H, path = os.path.join("weird", name + ".gml"))
+    return list(members_to_return.values())
+
+
+def get_name_for_cluster(members, used_names):
+    names = []
+    for m in members:
+        cluster = m.split("_")[0] # get the cluster number of this member
+        n = "_".join(m.split("_")[1:])
+        names.append(n) ## its name
+    gene_name = max(set(names), key=names.count) # get the most common gene name
+    while gene_name in used_names: ## add stars to prevent duplicate names
+        gene_name = gene_name + "*"
+    return gene_name
 
 ## get connected components
 def merge_clusters(orig_roary_dirs, G, clusters):
@@ -169,6 +190,9 @@ def merge_clusters(orig_roary_dirs, G, clusters):
     members_out = open("members.csv", "w")
     members_out.write("Gene,Members\n")
     out.write("Strain")
+
+    if not os.path.exists("weird"):
+        os.makedirs("weird")
 
     for cluster in range(1,52):
         if str(cluster) not in clusters:
@@ -187,8 +211,7 @@ def merge_clusters(orig_roary_dirs, G, clusters):
     cnt = 0
     for all_members in cc:  # each members is one gene with all its members
         H = G.subgraph(all_members)
-        split_members = split_cluster(H)
-
+        split_members = split_cluster(get_name_for_cluster(all_members, used_names), H)
         for members in split_members:
             cnt+=1
             cluster_presence_absence = {}
@@ -202,7 +225,6 @@ def merge_clusters(orig_roary_dirs, G, clusters):
                 cluster = m.split("_")[0] # get the cluster number of this member
                 n = "_".join(m.split("_")[1:])
                 names.append(n) ## its name
-                m = m.split()[0]
                 cluster_presence_absence[cluster] = [min(sum(x),1) for x in zip(cluster_presence_absence[cluster], gene_presence_absence[m])] # merge with existing (nothing if the first time)
 
             gene_name = max(set(names), key=names.count) # get the most common gene name
@@ -223,7 +245,6 @@ def merge_clusters(orig_roary_dirs, G, clusters):
     out.close()
     members_out.close()
     print("Number of weird genes: %d, number of good genes: %d" %(weird, good))
-    quit()
     return
 
 def generate_R_output(clusters):

@@ -52,7 +52,7 @@ X_eggnog/*.csv
 5.1_panaroo_merge/weird/*
 !5.1_panaroo_merge/weird/*.py
 5.1_panaroo_merge/*.csv
-
+5.1_panaroo_merge/*dbscan
 
 X_tree/*.txt
 X_tree/*.csv

@@ -133,8 +133,7 @@ legend = as_ggplot(get_legend(ggplot(curr, aes(x = genomes, y = richness, color 
   geom_errorbar(aes(ymin=min, ymax=max), width=.2,alpha = 0.2,
                 position=position_dodge(0.05)) + ggtitle(curr_cluster) + scale_color_brewer(palette = "Set1")))
 plots[[index]] = legend
-
 n = length(plots)
 nCol = floor(sqrt(n))
-do.call("grid.arrange", c(plots, ncol=nCol))
+do.call("grid.arrange", c(plots, ncol=5))
 

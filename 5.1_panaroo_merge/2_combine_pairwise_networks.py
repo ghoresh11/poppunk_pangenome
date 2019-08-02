@@ -9,7 +9,8 @@ from scipy.special import comb
 from sklearn.cluster import dbscan
 from Bio.SeqIO.FastaIO import SimpleFastaParser
 import time
-
+from math import sqrt
+import operator
 
 prefix = "panaroo_"
 
@@ -116,13 +117,62 @@ def read_gene_presence_absence(orig_roary_dirs):
                 gene_presence_absence[cluster + "_" + toks[0]] = map(int,toks[1:])
     return strains, gene_presence_absence
 
+
+def split_large_cluster(name, G):
+    ''' when a cluster is too big to handle, split it to a number of
+    smaller clusters first based on betweenness_centrality,
+    i.e. by removing nodes with very high betweenness_centrality '''
+    ## call split_cluster with each subgraph (that way it will carry on until a cluster is size 500)
+    ## add the nodes that were removed to which ever cluster they had more edges with
+    print("Splitting large cluster using betweenness centrality for size: %d" %len(G))
+    k = int(sqrt(len(G)))
+    betweenness_centrality = nx.betweenness_centrality(G, k = k)
+    betweenness_centrality = sorted(betweenness_centrality.items(), key=operator.itemgetter(1), reverse = True)
+    values = [x[1] for x in betweenness_centrality]
+    min_val = np.mean(values) + np.std(values)
+
+    remove = {}
+    for item in betweenness_centrality:
+        if item[1] > min_val:
+            remove[item[0]] = set(G.neighbors(item[0]))
+            continue
+        break
+    G.remove_nodes_from(list(remove.keys())) ## remove the nodes with high betweeneness
+    ccs_as_list = list(nx.connected_components(G))
+    ccs = nx.connected_components(G)
+    cnt = 0
+    clusters = []
+    ## find where the removed nodes should go
+    for node in remove:
+        G.add_node(node)
+        max_neighbours, chosen = -1, -1
+        for i in range(0, len(ccs_as_list)):
+            num_neighbours = len(list(set(remove[node] & ccs_as_list[i])))
+            print("neighbors of removed: %s, CC as a list: %s, Num neighbors: %d" %(str(remove[node]), str(ccs_as_list[i]), num_neighbours))
+            if num_neighbours > max_neighbours:
+                chosen = i
+                max_neighbours = num_neighbours
+
+        ## chosen edges to readd:
+        neighbours_to_add = list(set(remove[node] & ccs_as_list[chosen]))
+        for nei in neighbours_to_add:
+            G.add_edge(node, nei)
+
+
+    for c in ccs:
+        H = nx.Graph(G.subgraph(c))
+        clusters += split_cluster(name + "_" + str(cnt), H)
+    return clusters
+
+
 def split_cluster(name, H):
     ''' use dbscan to split connected components that don't make sense
     because of spurious matches
     When looking at the plots it's clear that there is structure in these structures
     and that sometimes the merge step incorrectly marks two genes as the same'''
-    if len(H) > 500: ## can't deal with such a large network...
-        return [list(H.nodes())]
+    if len(H) > 500: ## can't deal with such a large network... split it first with betweenness centrality
+        #return [list(H.nodes())]
+        return split_large_cluster(name, H)
     if len(H) < 50: ## I'll assume these aren't the problem for now
         return [list(H.nodes())]
     H = nx.convert_node_labels_to_integers(H, label_attribute = "origname")
@@ -141,7 +191,7 @@ def split_cluster(name, H):
             continue
         if labels[i] not in members_to_return:
             members_to_return[labels[i]] = []
-        members_to_return[labels[i]].append(H.nodes(data=True)[nodes[i]]["origname"])
+        members_to_return[labels[i]].append(H.nodes[nodes[i]]["origname"])
 
     nx.set_node_attributes(H, label_per_node, 'dbscan')
 
@@ -149,7 +199,11 @@ def split_cluster(name, H):
     for n in H.nodes(data=True):
         if n[1]["dbscan"] != -1:
             continue
-        curr_neighbours = H.neighbors(n[0])
+        curr_neighbours = list(H.neighbors(n[0]))
+        if len(curr_neighbours) < 3: ## if this node only has 3 edges consider it noise
+            print("decided this is noise %s!" %str(curr_neighbours))
+            members_to_return[n[1]["origname"]] = [n[1]["origname"]]
+            continue
         neighbour_clusters = []
         for k in curr_neighbours:
             neighbour_clusters.append(H.nodes[k]['dbscan'])
@@ -159,7 +213,6 @@ def split_cluster(name, H):
         else:
             members_to_return[curr_cluster].append(n[1]["origname"])
         n[1]["dbscan"] = curr_cluster
-
     nx.write_gml(H, path = os.path.join("weird", name + ".gml"))
     return list(members_to_return.values())
 
@@ -210,7 +263,7 @@ def merge_clusters(orig_roary_dirs, G, clusters):
     used_names = set()
     cnt = 0
     for all_members in cc:  # each members is one gene with all its members
-        H = G.subgraph(all_members)
+        H = nx.Graph(G.subgraph(all_members))
         split_members = split_cluster(get_name_for_cluster(all_members, used_names), H)
         for members in split_members:
             cnt+=1
@@ -258,7 +311,7 @@ def generate_R_output(clusters):
             continue
         freqs.write("," + str(c))
     freqs.write("\n")
-    cnt = 0
+    # cnt = 0
     with open("complete_presence_absence.csv") as f:
         for line in f:
             if line.startswith("Strain"):
@@ -271,8 +324,8 @@ def generate_R_output(clusters):
                         continue
                     indices[cluster] = [i for i, x in enumerate(toks) if x == str(cluster)]
                 continue
-            cnt += 1
-            print("Rewriting complete presence absence for gene: %d" %cnt)
+        #    cnt += 1
+        #    print("Rewriting complete presence absence for gene: %d" %cnt)
             gene_name = toks[0]
             freqs.write(gene_name)
             for cluster in range(1,52):

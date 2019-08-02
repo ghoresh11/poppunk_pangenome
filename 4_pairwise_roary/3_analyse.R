@@ -18,7 +18,7 @@ graphics = read.table("/Users/gh11/Submissions/my_thesis/Chapter3/figures/cluste
 #                               stringsAsFactors = F, comment.char = "", quote = "", sep = ",")
 
 
-freqs = read.table("180619/freqs.csv", header = T,row.names = 1,
+freqs = read.table("test_new/freqs.csv", header = T,row.names = 1,
                    stringsAsFactors = F, comment.char = "", quote = "", sep =",")
 o = as.numeric(unlist(lapply(colnames(freqs), gsub, pattern = "X", replacement = "")))
 graphics = graphics[match(o, graphics$Cluster),]
@@ -78,20 +78,20 @@ ggplot(freqs_for_acc_pca, aes(x = PC1, y = PC2, color = Cluster, shape = Cluster
 ## Trying to answer these questions:
 #1. How many rare/core genes are shared?
 #2. How many core genes are shared?
-gene_classes = data.frame(gene = rownames(freqs),
-                          core = rep(0, dim(freqs)[1]),
-                          inter = rep(0, dim(freqs)[1]),
-                          rare = rep(0, dim(freqs)[1]), stringsAsFactors = F)
-for (i in 1:dim(freqs)[1]){
-  curr_vec = freqs[i,]
-  gene_classes$core[i] = length(which(curr_vec >= 0.95))
-  gene_classes$inter[i] = length(which(curr_vec < 0.95 & curr_vec >= 0.15))
-  gene_classes$rare[i] =  length(which(curr_vec < 0.15 & curr_vec > 0))
-}
-
-
-write.table(x = gene_classes, file  = "180619/gene_classes.csv", sep = ",", col.names = T, row.names = F, quote = F)
-gene_classes = read.table("180619/gene_classes.csv", sep = ",", header = T, stringsAsFactors = F, comment.char = "", quote = "", row.names = 1)
+# gene_classes = data.frame(gene = rownames(freqs),
+#                           core = rep(0, dim(freqs)[1]),
+#                           inter = rep(0, dim(freqs)[1]),
+#                           rare = rep(0, dim(freqs)[1]), stringsAsFactors = F)
+# for (i in 1:dim(freqs)[1]){
+#   curr_vec = freqs[i,]
+#   gene_classes$core[i] = length(which(curr_vec >= 0.95))
+#   gene_classes$inter[i] = length(which(curr_vec < 0.95 & curr_vec >= 0.15))
+#   gene_classes$rare[i] =  length(which(curr_vec < 0.15 & curr_vec > 0))
+# }
+# 
+# 
+# write.table(x = gene_classes, file  = "test_new/gene_classes.csv", sep = ",", col.names = T, row.names = F, quote = F)
+gene_classes = read.table("test_new/gene_classes.csv", sep = ",", header = T, stringsAsFactors = F, comment.char = "", quote = "", row.names = 1)
 
 gene_classes = cbind(gene_classes, total_presence = rowSums(gene_classes))
 total_presence = data.frame(table(gene_classes$total_presence))
@@ -100,7 +100,7 @@ total_presence = data.frame(table(gene_classes$total_presence))
 
 ## examples of genes
 curr = data.frame(name = o,
-                  freq = unlist(freqs[which(rownames(freqs) == "group_6968"),]), stringsAsFactors = F)
+                  freq = unlist(freqs[which(rownames(freqs) == "vgrG1_1"),]), stringsAsFactors = F)
 curr$name = factor(curr$name, o)
 ggplot(curr, aes(x = name, y = freq)) + geom_bar(stat = "identity") +
   scale_y_continuous(limits = c(0,1), expand = c(0,0)) + theme_bw(base_size = 12) + theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
@@ -110,7 +110,7 @@ ggplot(curr, aes(x = name, y = freq)) + geom_bar(stat = "identity") +
 ## but there are a few clusters that are missing some key genes
 
 df = data.frame(variable = character(0), type = character(0),value = numeric(0),stringsAsFactors = F)
-for (size in 1:47) {
+for (size in 1:max(gene_classes$core)) {
   omni = gene_classes[which(gene_classes$total_presence == size),]
   omni = data.frame(table(omni$core, omni$inter, omni$rare), stringsAsFactors = F)
   colnames(omni) = c("core","inter","rare","freq")
@@ -128,10 +128,13 @@ p2 = ggplot(df, aes(x = variable, y = value, fill = type)) + geom_bar(stat = "id
   xlab("Number of clusters in which gene is present") + theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
   ylab("Fraction of genes")
 
+p2
+
 total_presence$Var1 = unique(df$variable)
 p1 = ggplot(total_presence, aes(x = total_presence$Var1, y = total_presence$Freq)) + geom_bar(stat = "identity") +
   xlab("Number of clusters in which gene is present") + ylab("Number of genes") +
   theme_bw(base_size = 16)+ theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
 
 
 p1

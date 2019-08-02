@@ -8,6 +8,13 @@ import subprocess
 import time
 import glob
 import signal
+from csv import reader
+import igraph
+from scipy.special import comb
+from sklearn.cluster import dbscan
+from math import sqrt
+import operator
+
 
 ## build a massive network where I have
 ## 39 colors = each of each cluster
@@ -18,9 +25,10 @@ import signal
 ## relationships between all the genes
 
 
-clusters_to_remove = range(1,10) + [21, 43, 49, 50] ## when not debugging, add more clusters here if they're weird, there is no 50
+#clusters_to_remove = [21, 43, 49, 50] ## when not debugging, add more clusters here if they're weird, there is no 50
 #clusters_to_remove = range(1,49) + [50] ## when debugging, will run on 24 and 39
-prefix = "new2_"
+clusters_to_remove = [21, 43, 49]
+prefix = ""
 
 def get_input_dirs(input_dir, pairwise = False):
     ''' check all directories in the input dir
@@ -29,6 +37,7 @@ def get_input_dirs(input_dir, pairwise = False):
     input_dir = os.path.abspath(input_dir)
     directories = os.listdir(input_dir)
     dirs_to_return = []
+    dirs_as_ints = []
     curr_prefix = prefix
     if pairwise:
         curr_prefix = ""
@@ -44,7 +53,62 @@ def get_input_dirs(input_dir, pairwise = False):
         ## use the post-processed outputs
         if os.path.isfile(os.path.join(input_dir, d, curr_prefix + "pan_genome_reference.fa")) and os.path.isfile(os.path.join(input_dir, d, curr_prefix + "gene_presence_absence.Rtab")):
             dirs_to_return.append(os.path.join(input_dir,d))
+
+            if not pairwise:
+                dirs_as_ints.append(int(d.replace("/","")))
+
+            if not os.path.isfile(os.path.join(input_dir, d, curr_prefix + "clustered_proteins")):
+                presence_absence_to_clustered_proteins(os.path.join(input_dir, d, curr_prefix + "gene_presence_absence.csv"),
+                os.path.join(input_dir, d, curr_prefix + "clustered_proteins"),
+                os.path.join(input_dir, d, curr_prefix + "gene_data.csv"))
+    if not pairwise:
+        for i in range(1,52):
+            if i not in dirs_as_ints:
+                clusters_to_remove.append(i)
     return dirs_to_return
+
+def get_panarooid_to_annotid(gene_data_file):
+    ''' parse the gene data file to convert panaroo ID to the annot ID'''
+    panarooid_to_annotid = {}
+    with open(gene_data_file) as f:
+        for line in f:
+            toks = line.strip().split(",")
+            panarooid_to_annotid[toks[2]] = toks[3]
+    return panarooid_to_annotid
+
+
+def get_panarooid_to_genename(clustered_proteins_file):
+    panarooid_to_genename = {}
+    with open(clustered_proteins_file) as f:
+        for line in f:
+            toks = line.strip().split()
+            gene_name = toks[0].replace(":","")
+            for m in toks[1:]:
+                panarooid_to_genename[m] = gene_name
+    return panarooid_to_genename
+
+def presence_absence_to_clustered_proteins(in_file, out_file, gene_data_file):
+    ''' create a clustered proteins file for the panaroo outputs'''
+    panarooid_to_annotid = get_panarooid_to_annotid(gene_data_file)
+    out = open(out_file, "w")
+    with open(in_file) as f:
+        for toks in reader(f, delimiter=','):
+            if toks[0] == "Gene":
+                member_index = toks.index('Avg group size nuc') + 1
+                continue
+            out.write(toks[0] + ":")
+            for ms in toks[member_index:]:
+                if ms == "":
+                    continue
+                ms = ms.split()
+                for m in ms:
+                    if "refound" in m:
+                        out.write("\t" + m)
+                    else:
+                        out.write("\t" + panarooid_to_annotid[m])
+            out.write("\n")
+    out.close()
+    return
 
 
 def init_network(orig_roary_dirs):
@@ -67,7 +131,6 @@ def init_network(orig_roary_dirs):
                 toks[0] = toks[0].replace(":","")
                 num_members = len(toks[1:])
                 for m in toks[1:]: ## go over all members of this cluster
-                    m = m.split("|")[1]
                     cluster_member_gene[cluster][m] = cluster + "_" + toks[0]
                 cluster_gene_size[cluster][cluster + "_" + toks[0]] = num_members
         ## get the frequency of each gene cluster and init the graph
@@ -191,7 +254,6 @@ def align_clusters(G, orig_roary_dirs):
             if cluster not in members_per_cluster:
                 members_per_cluster[cluster] = []
             members_per_cluster[cluster].append("_".join(m.split("_")[1:]))
-
         #
         merged_same_cluster = False
         for val in members_per_cluster.values():
@@ -200,27 +262,42 @@ def align_clusters(G, orig_roary_dirs):
                 break
         if not merged_same_cluster: ## this cluster only has members from a single original cluster
             continue
-
         ## write to a temp fasta file to see how they merge using cd-hit
     #    print("getting sequences...")
     #    start_time = time.time()
         num_sequences = 0
+        count_num_not_found = 0
         for curr_cluster in members_per_cluster:
             for d in orig_roary_dirs:
                 if d.split("/")[-1].split("_")[0] == str(curr_cluster):
                     ref_dir = d
+                    if prefix == "panaroo_":
+                        panarooid_to_genename = get_panarooid_to_genename(os.path.join(ref_dir, prefix + "clustered_proteins"))
+                        panarooid_to_annotid = get_panarooid_to_annotid(os.path.join(ref_dir, prefix + "gene_data.csv"))
                     break
             with open(os.path.join(ref_dir, prefix + "pan_genome_reference.fa")) as handle:
                 for values in SimpleFastaParser(handle):
-                    name = values[0].split()[1]
+                    if prefix == "panaroo_":
+                        if "refound" in values[0]:
+                            name = values[0]
+                        else:
+                            if panarooid_to_annotid[values[0]] in panarooid_to_genename:
+                                name = panarooid_to_genename[panarooid_to_annotid[values[0]]]
+                            else:
+                                name = panarooid_to_annotid[values[0]]
+                                count_num_not_found += 1
+                    else:
+                        name = values[0].split()[1]
                     if name in members_per_cluster[curr_cluster]:
                         ## THis output proves how choosing a different reference can really alter the results.
-                        tmp_out.write(">" + curr_cluster + "_" + name + "\n" + values[1] + "\n")
+                        tmp_out.write(">" + curr_cluster + "_" + name + "\n" + values[1].split(";")[0] + "\n")
                         num_sequences += 1
         tmp_out.close()
     #    print("--- %s seconds ---" % (time.time() - start_time))
-        if num_sequences > 1000: ## deal with the VERY large cluster seperately
+        if num_sequences > 1000: ## deal with the VERY large cluster seperately (run cdhit-est first...)
             os.rename("tmp_cluster_fasta.fa", str(cnt) + "_cluster_fasta.fa")  ## it needs a lot of cores and time
+            ## run cdhit to reduce the number of sequences
+            #subprocess.call(["cd-hit-est", "-i", str(cnt) + "_cluster_fasta.fa","-o", str(cnt) + "_cluster_fasta.fa", "-c","0.9", "-T", "4", "-d", "0","-A", "0.8", "-n", "5"])
             continue
 
         if num_sequences == 1: ## nothing to do
@@ -228,7 +305,7 @@ def align_clusters(G, orig_roary_dirs):
 
         ## get the all the SNPs between all the sequences by running an MSA
         out_msa = open("tmp_msa_file.fa", "w")
-        p = subprocess.Popen(["mafft", "--leavegappyregion", "tmp_cluster_fasta.fa"], stdout=out_msa, stderr=subprocess.PIPE)
+        p = subprocess.Popen(["mafft", "tmp_cluster_fasta.fa"], stdout=out_msa, stderr=subprocess.PIPE)
         p.wait()
         out_msa.close()
         msa = {}
@@ -237,35 +314,142 @@ def align_clusters(G, orig_roary_dirs):
             for values in SimpleFastaParser(handle):
                 msa[values[0]] = values[1]
 
+        ## check if there was a cdhit run (when the number of reps is very big):
+        cdhit_clusters = {}
+        if os.path.isfile(str(cnt) + "_cluster_fasta.fa.clstr"):
+            curr_members = []
+            curr_rep = ""
+            with open(str(cnt) + "_cluster_fasta.fa.clstr") as f:
+                for line in f:
+                    if line.startswith(">"):
+                        cdhit_clusters[curr_rep] = curr_members
+                        curr_members = []
+                        curr_rep= ""
+                        continue
+                    member = line.strip().split("...")[0].split(">")[-1]
+                    if "*" in line:
+                        curr_rep = member
+                    curr_members.append(member)
+            ## don't forget the last one
+            cdhit_clusters[curr_rep] = curr_members
+
         snp_distances = nx.Graph()
         keys = list(msa.keys())
         for i in range(0, len(keys)-1):
             snp_distances.add_node(keys[i])
+            if keys[i] in cdhit_clusters:
+                same_as_i = cdhit_clusters[keys[i]]
+            else:
+                same_as_i = [keys[i]]
+            for k in same_as_i:
+                snp_distances.add_node(k)
+                if k != keys[i]:
+                    snp_distances.add_edge(keys[i], k, weight = 0)
             for j in range(i+1, len(keys)):
-                snp_distances.add_node(keys[j])
-                mismatches = sum(1 for x,y in zip(msa[keys[i]].lower(), msa[keys[j]].lower()) if x != y)
-                if mismatches > 50:
-                    if G.has_edge(keys[i],keys[j]):
-                        G.remove_edge(keys[i],keys[j])
+                if keys[j] in cdhit_clusters:
+                    same_as_j = cdhit_clusters[keys[j]]
                 else:
-                    G.add_edge(keys[i],keys[j]) ## the edge isn't there when it should be
+                    same_as_j = [keys[j]]
+                for k in same_as_j:
+                    snp_distances.add_node(k)
+                    if k != keys[j]:
+                        snp_distances.add_edge(keys[j], k, weight = 0)
+                mismatches = sum(1 for x,y in zip(msa[keys[i]].lower(), msa[keys[j]].lower()) if x != y)
+                len_ignore = sum(1 for x,y in zip(msa[keys[i]], msa[keys[j]]) if x == y and x == "-") ## not part of the pairwise alignment
+                max_mismatches = 0.2 * (len(msa[keys[i]]) - len_ignore) ## this is arbitrary but you have to choose something
+
+                #print("alignment len: %d, shared length: %d, allowed mismatches %f" %(len(msa[keys[i]]),(len(msa[keys[i]]) - len_ignore), max_mismatches))
+                if mismatches > max_mismatches:
+                    for val1 in same_as_i:
+                        for val2 in same_as_j:
+                            if G.has_edge(val1,val2):
+                                G.remove_edge(val1,val2)
+                else:
+                    for val1 in same_as_i:
+                        for val2 in same_as_j:
+                            G.add_edge(val1,val2) ## the edge isn't there when it should be
                     snp_distances.add_edge(keys[i], keys[j], weight = mismatches)
 
-        if snp_distances.number_of_edges() == 0:
+
+        if snp_distances.number_of_edges() < 2:
             continue
-        snp_distances = nx.minimum_spanning_tree(snp_distances) ## will it work if it's not fully connected?
+
         with open(os.path.join("snp_trees", str(cnt) + "_snp_tree.csv"), "w") as out:
             out.write("Node1, Node2, Cluster, Cluster, SNPs\n")
-            ## this will print out the original clusters... remove edges of more than 50 SNPs
-            for e in snp_distances.edges(data=True):
-                cluster1 = e[0].split("_")[0]
-                cluster2 = e[1].split("_")[0]
-                out.write(",".join([e[0], e[1], cluster1, cluster2, str(e[2]["weight"])]) + "\n")
+            ccs = (nx.Graph(snp_distances.subgraph(c)) for c in nx.connected_components(snp_distances))
+            for subgraph in ccs:
+                subgraph = nx.minimum_spanning_tree(subgraph)
+                ## this will print out the original clusters
+                for e in snp_distances.edges(data=True):
+                    cluster1 = e[0].split("_")[0]
+                    cluster2 = e[1].split("_")[0]
+                    out.write(",".join([e[0], e[1], cluster1, cluster2, str(e[2]["weight"])]) + "\n")
 
     for f in glob.glob("tmp*"):
         os.remove(f)
     return G
 
+def split_cluster(name, H):
+    ''' use dbscan to split connected components that don't make sense
+    because of spurious matches
+    When looking at the plots it's clear that there is structure in these structures
+    and that sometimes the merge step incorrectly marks two genes as the same'''
+    if len(H) > 500: ## can't deal with such a large network... split it first with betweenness centrality
+        return [list(H.nodes())]
+        #return split_large_cluster(name, H)
+    if len(H) < 50: ## I'll assume these aren't the problem for now
+        return [list(H.nodes())]
+    H = nx.convert_node_labels_to_integers(H, label_attribute = "origname")
+    edges = zip(*nx.to_edgelist(H))
+    H1 = igraph.Graph(len(H), zip(*edges[:2]))
+    X = 1 - np.array(H1.similarity_jaccard(loops=False))
+    db = dbscan(X, metric='precomputed', eps=0.7, min_samples=4)
+
+    labels = db[1] ## the cluster labeling
+    label_per_node = {}
+    members_to_return = {}
+    nodes = list(H.nodes())
+    for i in range(0, len(labels)):
+        label_per_node[nodes[i]] = labels[i]
+        if labels[i] == -1:
+            continue
+        if labels[i] not in members_to_return:
+            members_to_return[labels[i]] = []
+        members_to_return[labels[i]].append(H.nodes[nodes[i]]["origname"])
+
+    nx.set_node_attributes(H, label_per_node, 'dbscan')
+
+    ## fix noise: for now just take the closet cluster, might be better to seprate entirely
+    for n in H.nodes(data=True):
+        if n[1]["dbscan"] != -1:
+            continue
+        curr_neighbours = list(H.neighbors(n[0]))
+        if len(curr_neighbours) < 3: ## if this node only has 3 edges consider it noise
+            print("decided this is noise %s!" %str(curr_neighbours))
+            members_to_return[n[1]["origname"]] = [n[1]["origname"]]
+            continue
+        neighbour_clusters = []
+        for k in curr_neighbours:
+            neighbour_clusters.append(H.nodes[k]['dbscan'])
+        curr_cluster = max(set(neighbour_clusters), key = neighbour_clusters.count)
+        if curr_cluster == -1: ## really is noise, it's own cluster
+            members_to_return[n[1]["origname"]] = [n[1]["origname"]]
+        else:
+            members_to_return[curr_cluster].append(n[1]["origname"])
+        n[1]["dbscan"] = curr_cluster
+    nx.write_gml(H, path = os.path.join("weird", name + ".gml"))
+    return list(members_to_return.values())
+
+def get_name_for_cluster(members, used_names):
+    names = []
+    for m in members:
+        cluster = m.split("_")[0] # get the cluster number of this member
+        n = "_".join(m.split("_")[1:])
+        names.append(n) ## its name
+    gene_name = max(set(names), key=names.count) # get the most common gene name
+    while gene_name in used_names: ## add stars to prevent duplicate names
+        gene_name = gene_name + "*"
+    return gene_name
 
 def merge_clusters(orig_roary_dirs, G):
     ''' use the connected components of the graph to merge
@@ -280,6 +464,10 @@ def merge_clusters(orig_roary_dirs, G):
     # This section is for writing the new presence absence file:
     out = open("complete_presence_absence.csv","w")
     members_out = open("members.csv", "w")
+
+    if not os.path.exists("weird"):
+        os.makedirs("weird")
+
     members_out.write("Gene,Members\n")
     out.write("Strain")
     for cluster in range(1,52):
@@ -296,43 +484,47 @@ def merge_clusters(orig_roary_dirs, G):
     out.write("\n")
 
     used_names = set()
-    for members in cc: ## each members is one gene with all its members
-        ## first check how many different clusters of each cluster this has
-        cluster_counts = {}
-        for m in members:
-            cluster = m.split("_")[0]
-            if cluster not in cluster_counts:
-                cluster_counts[cluster] = 0
-            cluster_counts[cluster] += 1
-        cluster_presence_absence = {}
+    ## here I can also apply a dbscan step-> similar to what I did for the panaroo outputs...
+    for all_members in cc:  # each members is one gene with all its members
+        H = nx.Graph(G.subgraph(all_members))
+        split_members = split_cluster(get_name_for_cluster(all_members, used_names), H)
+        for members in split_members:
+            ## first check how many different clusters of each cluster this has
+            cluster_counts = {}
+            for m in members:
+                cluster = m.split("_")[0]
+                if cluster not in cluster_counts:
+                    cluster_counts[cluster] = 0
+                cluster_counts[cluster] += 1
+            cluster_presence_absence = {}
 
-        ## init counter for this gene for all clusters
-        for cluster in range(1,52):
-            if cluster in clusters_to_remove:
-                continue
-            cluster_presence_absence[str(cluster)] = [0] * len(strains[str(cluster)])
+            ## init counter for this gene for all clusters
+            for cluster in range(1,52):
+                if cluster in clusters_to_remove:
+                    continue
+                cluster_presence_absence[str(cluster)] = [0] * len(strains[str(cluster)])
 
-        names = []
-        for m in members:
-            cluster = m.split("_")[0] # get the cluster number of this member
-            names.append("_".join(m.split("_")[1:])) ## its name
-            m = m.split()[0]
-            cluster_presence_absence[cluster] = [min(sum(x),1) for x in zip(cluster_presence_absence[cluster], gene_presence_absence[m])] # merge with existing (nothing if the first time)
+            names = []
+            for m in members:
+                cluster = m.split("_")[0] # get the cluster number of this member
+                names.append("_".join(m.split("_")[1:])) ## its name
+                m = m.split()[0]
+                cluster_presence_absence[cluster] = [min(sum(x),1) for x in zip(cluster_presence_absence[cluster], gene_presence_absence[m])] # merge with existing (nothing if the first time)
 
-        gene_name = max(set(names), key=names.count) # get the most common gene name
-        while gene_name in used_names: ## add stars to prevent duplicate names
-            gene_name = gene_name + "*"
+            gene_name = max(set(names), key=names.count) # get the most common gene name
+            while gene_name in used_names: ## add stars to prevent duplicate names
+                gene_name = gene_name + "*"
 
-        used_names.add(gene_name)
-        members_out.write(gene_name + "," + "\t".join(members) + "\n")
+            used_names.add(gene_name)
+            members_out.write(gene_name + "," + "\t".join(members) + "\n")
 
-        out.write(gene_name)
-        for cluster in range(1,52):
-            if cluster in clusters_to_remove:
-                continue
-            line = map(str,cluster_presence_absence[str(cluster)])
-            out.write("," + ",".join(line))
-        out.write("\n")
+            out.write(gene_name)
+            for cluster in range(1,52):
+                if cluster in clusters_to_remove:
+                    continue
+                line = map(str,cluster_presence_absence[str(cluster)])
+                out.write("," + ",".join(line))
+            out.write("\n")
     out.close()
     members_out.close()
     return
@@ -399,7 +591,6 @@ def run(args):
     generate_R_output()
     return
 
-
 def get_options():
     parser = argparse.ArgumentParser(description='Extract the gene sequences from roary outputs, and merge rare genes')
     ''' input options
@@ -408,7 +599,6 @@ def get_options():
     job_name=combine_roary
     bsub -J ${job_name} -R"select[mem>15000] rusage[mem=15000]" -M15000  -G team216 -o ${job_name}.o -e ${job_name}.e python 2_build_pairwise_connections.py
     '''
-
     parser.add_argument('--input_dir', required=False,
                         type=str, default =  "/lustre/scratch118/infgen/team216/gh11/e_coli_collections/poppunk/new_roary/",
                         help='path to original roary input directory for each cluster [%(default)s]')

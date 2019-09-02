@@ -38,8 +38,7 @@ X_eggnog/*.csv
 4_pairwise_roary/specific_genes/
 4_pairwise_roary/snp_trees/
 4_pairwise_roary/thresholds/
-4_pairwise_roary/test_new/
-4_pairwise_roary/150719/
+4_pairwise_roary/020919/
 
 5.0_run_panaroo/panaroo_vs_roary/cluster30*
 5.0_run_panaroo/panaroo_vs_roary/*.csv
@@ -53,6 +52,10 @@ X_eggnog/*.csv
 !5.1_panaroo_merge/weird/*.py
 5.1_panaroo_merge/*.csv
 5.1_panaroo_merge/*dbscan
+
+6_AMR_vir_plasmid/results/
+6_AMR_vir_plasmid/smaller_tree/*.gff
+
 
 X_tree/*.txt
 X_tree/*.csv

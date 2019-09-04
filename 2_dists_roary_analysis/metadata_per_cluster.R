@@ -95,7 +95,7 @@ plot_metadata_per_cluster<- function(name, order, cols, title){
   Continent$value = factor(Continent$value, order)
   p = ggplot(Continent, aes( x = cluster, y = count, fill = value)) + geom_bar(stat = "identity", color = "black") +
     theme_classic(base_size = 12) + scale_fill_manual(values = cols, name = name)+
-    xlab("Cluster") + ylab("Fraction of isolates") + scale_y_continuous(expand = c(0,0)) + ggtitle(title)+ 
+    xlab("PopPUNK Cluster") + ylab("Fraction of isolates") + scale_y_continuous(expand = c(0,0)) + ggtitle(title)+ 
     theme(axis.text.x = element_text(angle = 90, hjust = 1)) + theme(legend.position = "bottom")
   
   return(p)
@@ -181,15 +181,15 @@ graphics = read.table("/Users/gh11/Submissions/my_thesis/Chapter3/figures/cluste
                       header = T, comment.char = "")
 graphics = graphics[match(cluster_order, graphics$Cluster),]
 
-D = ggplot(Year, aes(x = value, y = count, color = cluster, shape = cluster)) + geom_point(size = 3, alpha = 0.8)+ 
+D = ggplot(Year, aes(x = value, y = count, color = cluster, shape = cluster)) + geom_point(size = 3, alpha = 0.8, stroke = 1)+ 
   scale_color_manual(values = as.character(graphics$Color), name = "") + scale_shape_manual(values = graphics$Shape, name = "") +
   theme_bw(base_size = 12) + xlab("Year") + ylab("Fraction of isolates")+  
-  guides(color=guide_legend(ncol=7), shape =guide_legend(ncol = 7)) + ggtitle("D") 
+  guides(color=guide_legend(ncol=7), shape =guide_legend(ncol = 7)) + ggtitle("D") +guides(color=guide_legend(nrow=6,byrow=TRUE))
 
 #ggsave(plot =  p, file = paste(outpath, "Year.pdf", sep = ""), height = 5, width = 7)
-D
-legend = as_ggplot(get_legend(D))
 
+legend = as_ggplot(get_legend(D))
+legend
 D = D + theme(legend.position = "None")
 
 all_years = Year$value
@@ -217,7 +217,6 @@ lay = rbind(c(NA,NA,NA,NA,3,3),
 grid.arrange(B,C,D, layout_matrix = lay)
 ## to save as an image: width = 800, height = 800
 ##length(which(md$Poppunk_cluster == "2"))
-
 
 # ### Look at the metadata per cluster, stratified
 # 

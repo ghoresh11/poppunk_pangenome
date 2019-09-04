@@ -110,7 +110,7 @@ variable_2_order = c("small", "not_small")
 cols = brewer.pal(n = 5, "Blues")[-1]
 
 roary_outputs = read.table("roary_summary_file.csv", sep = ",", header = T, stringsAsFactors = F)
-roary_outputs = read.table("new_summary_per_cluster.csv", sep = ",", header = T, stringsAsFactors = F)
+
 ## add info to the roary outputs CSV
 sizes = cluster_sizes$Size[match(roary_outputs$cluster, cluster_sizes$Cluster)]
 roary_outputs = cbind(roary_outputs, size = sizes)
@@ -157,12 +157,12 @@ roary_outputs = roary_output_collapsed
 ## Barplot
 cluster_order = unique(roary_outputs$cluster[order(roary_outputs$size, decreasing = T)])
 roary_outputs$variable = factor(roary_outputs$variable, variable_order)
-roary_outputs$cluster = factor(roary_outputs$cluster, cluster_order)
+roary_outputs$cluster = factor(roary_outputs$cluster , graphics$Cluster)
 C = ggplot(roary_outputs, aes(x = cluster, y = count, fill = variable)) + 
   geom_bar(stat = "identity", color = "black") + 
   scale_fill_manual(values = cols, labels = labs, name = "") + theme_classic(base_size = 12) +
-  scale_y_continuous(expand = c(0,0)) + xlab("Cluster") + 
-  ylab("Genes") + ggtitle("C") + theme(legend.position = "bottom") + guides(fill=guide_legend(nrow=3, byrow = T))
+  scale_y_continuous(expand = c(0,0)) + xlab("PopPUNK Cluster") + 
+  ylab("Genes") + ggtitle("D") + theme(legend.position = "bottom") + guides(fill=guide_legend(nrow=3, byrow = T))
 C
 
 
@@ -180,15 +180,16 @@ sd(roary_outputs$count[roary_outputs$variable == "rare"])
 
 ## connection between cluster size and number of genes from each category
 roary_outputs$variable = factor(roary_outputs$variable, variable_order)
+roary_outputs$cluster = factor(roary_outputs$cluster , graphics$Cluster)
 ggplot(roary_outputs, aes(y = count, x = size, fill = variable)) + 
   geom_point(size = 3, pch=21, color = "black", alpha = 0.7) +
   theme_bw(base_size = 16) + xlab("Cluster size") + ylab("Genes") +
   scale_fill_manual(values = cols, labels = labs)
-ggplot(roary_outputs, aes(y = count, x = size, fill = variable)) + 
+D = ggplot(roary_outputs, aes(y = count, x = size, fill = variable)) + 
   geom_point(size = 3, pch=21, color = "black", alpha = 0.7) +
   theme_bw(base_size = 12) + xlab("Cluster size") + ylab("Genes") +
   scale_fill_manual(values = cols, guide = F) +  geom_smooth(method = "gam", formula = y ~ s(log(x)), aes(color = variable)) +
-  scale_color_manual(values = cols, guide = F) + ggtitle("D")
+  scale_color_manual(values = cols, guide = F) + ggtitle("E")
 D
 
 ## add distances

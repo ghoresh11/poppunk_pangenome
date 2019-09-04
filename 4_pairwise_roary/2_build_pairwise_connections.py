@@ -21,7 +21,7 @@ from sklearn.cluster import DBSCAN
 
 
 #clusters_to_remove = [21, 43, 49, 50] ## when not debugging, add more clusters here if they're weird, there is no 50
-#clusters_to_remove = list(range(1,47)) + [50] ## when debugging, will run on 47,48,49 and 51
+#clusters_to_remove = list(range(1,48)) + [50] ## when debugging, will run on 47,48,49 and 51
 clusters_to_remove = [21, 43, 49] ## when actually running
 prefix = ""
 
@@ -145,7 +145,6 @@ def connect_two_clusters(pairwise_roary_dirs, cluster_member_gene, cluster_gene_
     G is directed and the weight of the edge is the proprtion of members of
     that group that mapped to members in the other group'''
     print("Connecting clusters...")
-    print("Calculating pairwise comparisons...")
     for d in pairwise_roary_dirs:
         clusters = d.split("/")[-1].split("_")
         cluster1 = clusters[0]
@@ -198,7 +197,7 @@ def connect_two_clusters(pairwise_roary_dirs, cluster_member_gene, cluster_gene_
     return
 
 
-def read_gene_presence_absence(orig_roary_dirs):
+def read_gene_presence_absence(orig_roary_dirs, remove):
     ''' get the gene presence absence vector for each gene in each
     cluster
     return: a list of strains that will be in the big gene-presence-absence
@@ -213,9 +212,19 @@ def read_gene_presence_absence(orig_roary_dirs):
             for line in f:
                 toks = line.strip().split("\t")
                 if line.startswith("Gene"):
-                    strains[cluster] = toks[1:]
+                    curr_strains = toks[1:]
+                    index_to_remove = []
+                    for i in range(0,len(curr_strains)):
+                        if curr_strains[i] in remove:
+                            index_to_remove += [i]
+                    for i in sorted(index_to_remove, reverse=True):
+                        del curr_strains[i]
+                    strains[cluster] = curr_strains
                     continue
-                gene_presence_absence[cluster + "_" + toks[0]] = map(int,toks[1:])
+                curr_counts = map(int,toks[1:])
+                for i in sorted(index_to_remove, reverse=True):
+                    del curr_counts[i]
+                gene_presence_absence[cluster + "_" + toks[0]] = curr_counts
     return strains, gene_presence_absence
 
 
@@ -261,15 +270,13 @@ def split_cluster(name, H):
     because of spurious matches
     When looking at the plots it's clear that there is structure in these structures
     and that sometimes the merge step incorrectly marks two genes as the same'''
-    if len(H) > 500: ## can't deal with such a large network... split it first with betweenness centrality
-        return []
-    if len(H) < 5: ## assume these aren't the problem, they only have one member from each cluster?
+    if len(H) < 50: ## assume these aren't the problem, they only have one member from each cluster?
         return []
     H = nx.convert_node_labels_to_integers(H, label_attribute = "origname")
     edges = list(zip(*nx.to_edgelist(H)))
     H1 = igraph.Graph(len(H), list(zip(*edges[:2])))
     X = 1 - np.array(H1.similarity_jaccard(loops=False))
-    db = DBSCAN(metric='precomputed', eps=0.5, min_samples=6, n_jobs=16).fit(X)
+    db = DBSCAN(metric='precomputed', eps=0.5, min_samples=4, n_jobs=16).fit(X)
     #labels = db[1] ## the cluster labeling
     labels = db.labels_
     label_per_node = {}
@@ -305,8 +312,8 @@ def split_cluster(name, H):
     ## remove edges from G -> return the edges that need to be removed
     edges_to_remove = []
     for e in H.edges():
-        if H.nodes[e[0]]['dbscan'] != H.nodes[e[1]]['dbscan'] and H.nodes[e[1]]['dbscan'] != -1:
-            edges_to_remove.append(e)
+        if H.nodes[e[0]]['dbscan'] != H.nodes[e[1]]['dbscan']:
+            edges_to_remove.append((H.nodes[e[0]]['origname'],H.nodes[e[1]]['origname']))
     return edges_to_remove
 
 def get_name_for_cluster(members, used_names):
@@ -328,23 +335,23 @@ def dbscan_split_clusters(orig_roary_dirs, G):
     first column is the strain and the second in the cluster (so I can look at
     each cluster indivudially'''
     cc = sorted(nx.connected_components(G), key=len, reverse=True) ##
-    print("PRE ALL")
+    print("PRE ALL = original number of connected components")
     print(len(list(cc)))
     ## remove duplicated nodes from the largest cluster
     nodes_to_remove = minimise_large_cluster_1(list(cc[0]), orig_roary_dirs)
     for n in nodes_to_remove:
         G.remove_node(n)
     cc = sorted(nx.connected_components(G), key=len, reverse=True) ##
-    print("POST MINIMISE CLUSTER 1")
+    print("POST MINIMISE CLUSTER 1 = after removing nodes of the very large cluster")
     print(len(list(cc)))
-    strains, gene_presence_absence = read_gene_presence_absence(orig_roary_dirs)
     # This section is for writing the new presence absence file:
     if not os.path.exists("dbscan"):
         os.makedirs("dbscan")
     used_names = set()
     for all_members in cc:  # each members is one gene with all its members
+        name = get_name_for_cluster(all_members, used_names)
         H = nx.Graph(G.subgraph(all_members))
-        edges_to_remove = split_cluster(get_name_for_cluster(all_members, used_names), H)
+        edges_to_remove = split_cluster(name, H)
         G.remove_edges_from(edges_to_remove)
     return G
 
@@ -363,7 +370,7 @@ def snp_distance_split(G, orig_roary_dirs):
     if not os.path.exists("snp_trees"):
         os.makedirs("snp_trees")
     cc = sorted(nx.connected_components(G), key=len, reverse=True) ## get connected components
-    print("POST DBSCAN - PRE SNPS")
+    print("POST DBSCAN - PRE SNPS = after removing edges based on dbscan")
     print(len(list(cc)))
     cnt = 0
     for members in cc: ## each members is one gene with all its members
@@ -402,9 +409,9 @@ def snp_distance_split(G, orig_roary_dirs):
                         num_sequences += 1
         tmp_out.close()
 
-        if num_sequences > 1000:
-            os.rename("tmp_cluster_fasta.fa", str(cnt) + "_cluster_fasta.fa") ## still too large to run MSA??
-            continue
+        # if num_sequences > 1000:
+        #     os.rename("tmp_cluster_fasta.fa", str(cnt) + "_cluster_fasta.fa") ## still too large to run MSA??
+        #     continue
 
         if num_sequences == 1: ## nothing to do
             continue
@@ -479,6 +486,28 @@ def add_cluster_one_to_members(members):
         members += curr_members
     return members
 
+
+def get_duplicates_to_remove():
+    ''' take genomes which are identical from the MASH output and
+    ignore them in the complete presence absence file'''
+    duplicate_graph = nx.Graph()
+    with open("/lustre/scratch118/infgen/team216/gh11/e_coli_collections/poppunk/new_roary/pairwise/analysis/identical.tab") as f:
+        for line in f:
+            first = line.split()[0].split("/")[-1].replace(".gff","")
+            second = line.split()[1].split("/")[-1].replace(".gff","")
+            duplicate_graph.add_edge(first,second)
+    identicals = sorted(nx.connected_components(duplicate_graph), key=len, reverse=True)
+    for i in range(0,len(identicals)):
+        if len(list(identicals[i])) < 2:
+            index = i
+            break
+    identicals = identicals[:index]
+    remove = []
+    for l in identicals:
+        remove += list(l)[1:] ## remove all but the first item
+    return remove
+
+
 def rewrite_outputs(orig_roary_dirs, G):
     ''' use the connected components of the graph to merge
     genes which may not have needed to be seperated in the first place
@@ -488,7 +517,8 @@ def rewrite_outputs(orig_roary_dirs, G):
     cc = sorted(nx.connected_components(G), key=len, reverse=True) ##
     print("POST SNP SPLITTING")
     print(len(list(cc)))
-    strains, gene_presence_absence = read_gene_presence_absence(orig_roary_dirs)
+    remove = get_duplicates_to_remove()
+    strains, gene_presence_absence = read_gene_presence_absence(orig_roary_dirs,remove)
     # This section is for writing the new presence absence file:
     out = open("complete_presence_absence.csv","w")
     members_out = open("members.csv", "w")

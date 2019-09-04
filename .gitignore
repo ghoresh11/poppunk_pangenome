@@ -6,6 +6,8 @@ calculate_rand_indices.py
 ## list of assembly files
 assemblies.txt
 
+SELECTED_METADATA.csv
+
 ## outputs of different Ks for poppunk
 clusters/
 functions/
@@ -38,7 +40,8 @@ X_eggnog/*.csv
 4_pairwise_roary/specific_genes/
 4_pairwise_roary/snp_trees/
 4_pairwise_roary/thresholds/
-4_pairwise_roary/020919/
+4_pairwise_roary/*0919*/
+4_pairwise_roary/identical.tab
 
 5.0_run_panaroo/panaroo_vs_roary/cluster30*
 5.0_run_panaroo/panaroo_vs_roary/*.csv

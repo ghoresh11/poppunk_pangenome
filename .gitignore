@@ -42,6 +42,7 @@ X_eggnog/*.csv
 4_pairwise_roary/thresholds/
 4_pairwise_roary/*0919*/
 4_pairwise_roary/identical.tab
+4_pairwise_roary/classify_genes/*.csv
 
 5.0_run_panaroo/panaroo_vs_roary/cluster30*
 5.0_run_panaroo/panaroo_vs_roary/*.csv

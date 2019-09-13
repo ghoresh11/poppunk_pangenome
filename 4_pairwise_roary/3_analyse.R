@@ -196,7 +196,7 @@ summary_depleted$cluster =  sapply(summary_depleted$cluster, FUN = gsub, pattern
 summary_depleted = cbind(summary_depleted, phylogroup = graphics$Phylogroup[match(summary_depleted$cluster, graphics$Cluster)])
 summary_depleted$cluster = factor(summary_depleted$cluster, rev(graphics$Cluster))
 summary_depleted$phylogroup = factor(summary_depleted$phylogroup, c("B2", "F", "D","E","A","C","B1","U"))
-write.table(summary_depleted, file = "depleted_genes.csv", sep = ",", col.names = T, row.names = F, quote = F)
+write.table(summary_depleted, file = "missing_specific_genes/depleted_genes.csv", sep = ",", col.names = T, row.names = F, quote = F)
 
 p1 = ggplot(summary_depleted, aes(x = cluster, y = num_genes)) + geom_bar(stat = "identity") + theme_classic(base_size = 12)  + 
   ylab("Genes") + xlab("PopPUNK cluster") + scale_y_continuous(expand = c(0.01,0,0.1,0))+
@@ -236,7 +236,7 @@ summary_specific$cluster =  sapply(summary_specific$cluster, FUN = gsub, pattern
 summary_specific = cbind(summary_specific, phylogroup = graphics$Phylogroup[match(summary_specific$cluster, graphics$Cluster)])
 summary_specific$cluster = factor(summary_specific$cluster, rev(graphics$Cluster))
 summary_specific$phylogroup = factor(summary_specific$phylogroup, c("B2", "F", "D","E","A","C","B1","U"))
-write.table(summary_specific, file = "specific_genes.csv", sep = ",", col.names = T, row.names = F, quote = F)
+write.table(summary_specific, file = "missing_specific_genes/specific_genes.csv", sep = ",", col.names = T, row.names = F, quote = F)
 
 p2 = ggplot(summary_specific, aes(x = cluster, y = num_genes)) + geom_bar(stat = "identity") + theme_classic(base_size = 12)  + 
   ylab("Genes") + xlab("PopPUNK cluster") + scale_y_continuous(expand = c(0.01,0,0.1,0))+
@@ -248,3 +248,10 @@ lay2 = rbind(c(1,3,3,3),
             c(4,4,4,NA))
 plot_for_num(1, p2, lay2)
 
+p2
+p1
+
+grid.arrange(p1,p2, nrow = 2)
+
+## relationship between number of depleted genes vs number of enriched genes
+plot(summary_depleted$num_genes, summary_specific$num_genes)

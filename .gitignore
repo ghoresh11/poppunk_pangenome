@@ -49,6 +49,7 @@ X_eggnog/*.csv
 4_pairwise_roary/classify_genes/eggnog*
 4_pairwise_roary/classify_genes/sequences/*
 *entry.list*
+*.gml
 
 5.0_run_panaroo/panaroo_vs_roary/cluster30*
 5.0_run_panaroo/panaroo_vs_roary/*.csv

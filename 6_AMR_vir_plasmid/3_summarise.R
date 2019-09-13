@@ -23,17 +23,38 @@ graphics = graphics[order(as.numeric(graphics$Cluster), decreasing = F),]
 
 ### plotting heatmaps of genes along the tree
 tree = read.tree("smaller_tree/raxml_tree_mod.nwk")
-tree = root(tree,outgroup = "45")
+tree = root(tree,outgroup = "NC_011740")
+#plot(tree)
+tree = drop.tip(tree, tip =  "NC_011740")
+#plot(tree)
 tree_md = read.table("smaller_tree/smaller_tree.csv", sep = ",", comment.char = "", stringsAsFactors = F,
                      quote = "", header = T)
 
-plot(tree)
 
 ############## FUNCTIONS #############
 
+plot_medians<- function(md, num, ylab){
+  x = aggregate(x = md$num_new_genes, by = list(md$Poppunk_cluster), FUN = mean)
+  sd_x = aggregate(x = md$num_new_genes, by = list(md$Poppunk_cluster), FUN = sd)
+  y = aggregate(x = num, by = list(md$Poppunk_cluster), FUN = mean)
+  sd_y = aggregate(x = num, by = list(md$Poppunk_cluster), FUN = sd)
+  cluster = x$Group.1
+  ## just in case, match everything:
+  sd_x = sd_x[match(x$Group.1, sd_x$Group.1),]
+  y = y[match(x$Group.1, y$Group.1),]
+  sd_y = sd_y[match(x$Group.1, sd_y$Group.1),]
+  
+  df = data.frame(cluster = cluster,
+                  num_genes = x$x, num_genes_sd = sd_x$x,
+                  num_res_genes = y$x, num_res_genes_sd = sd_y$x, stringsAsFactors = F)
+  p = ggplot(df, aes(x = num_genes, y = num_res_genes, label = cluster)) + 
+    geom_text() + xlab("Median number of genes per isolate") +
+    ylab(paste("Median number of ",ylab ," per isolate", sep = "")) + theme_bw(base_size = 14)
+  return(p)
+}
+
 plot_boxplot <- function(md, vec, breaks, ylab){
   md = cbind(md, vec)
-  pairwise.wilcox.test(x = md$vec, g = md$Poppunk_cluster, p.adjust.method = "fdr")
   md$Poppunk_cluster = factor(md$Poppunk_cluster, graphics$Cluster)
   p = ggplot(md, aes(x = Poppunk_cluster, y = vec, shape = Poppunk_cluster, color = Poppunk_cluster)) + 
     geom_jitter(width = 0.3, height = 0.2, size = 1.2, stroke = 1.2, alpha = 0.5) +
@@ -76,6 +97,7 @@ read_one_file <- function(filename, ylab, desc_file){
   add_orig_md = num[match(rownames(orig_md), rownames(df_no_trunc))]
   orig_md = cbind(orig_md, add_orig_md)
   
+  num[which(num == max(num))]
   descs = read.table(desc_file, sep = ",", comment.char = "", quote = "", stringsAsFactors = F, header = T)
 
   sigs = calculate_stats(vec = num, md = md)
@@ -92,7 +114,8 @@ read_one_file <- function(filename, ylab, desc_file){
     curr = cbind(cluster = rep(s, length(genes)), freq = genes, curr)
     res = rbind(res, curr)
   }
-  p = plot_boxplot(md, num, seq(from=0, to=max(num),by=1), ylab)
+  print(plot_boxplot(md, num, seq(from=0, to=max(num),by=1), ylab))
+  p = plot_medians(md, num, ylab)
   write.table(x = res, file = paste("results/",ylab, "_signif.csv", sep = ""), sep = ",", row.names = F, col.names = T, quote = F)
   return(list(orig_md, sigs, p))
 }
@@ -150,8 +173,7 @@ plot_on_tree <- function(filename, desc_file, tree, signif){
   rownames(res) = tip_labels
   p = ggtree(tree)  +
     theme(legend.position="right") + geom_tiplab(align = T)
-  
-  
+ # tree$tip.label = factor(tree$tip.label, tree$tip.label)
   p2 = gheatmap(p = p, data = res, offset = 0.1, width=5, color = "black", 
                 high = "#023858", low = "#fff7fb", colnames_angle = 90, colnames = T, colnames_position = "bottom",
                 font.size = 3)
@@ -182,6 +204,16 @@ get_median_per_cluster <- function(filename,lab){
   return(res)
 }
 
+summary_by_column <- function(filename){
+  ## look at which genes are the most common in the population (they have a high average freq)
+  ## find columns which are correlated/anticorrelated
+  df = read.table(filename, sep = ",", header = T, comment.char = "",
+                  quote = "", stringsAsFactors = F, row.names = 1)
+  df[df == "1*"] = 0
+  md = orig_md[match(rownames(df), rownames(orig_md)),]
+  df = data.frame(lapply(df, as.numeric))
+}
+
 
 ## without truncated
 
@@ -194,25 +226,30 @@ A = res[[3]]
 colnames(orig_md)[dim(orig_md)[2]] = "amr"
 B = plot_on_tree("results/resfinder.csv","DBs/break_names/resfinder_genes_fixed.csv", tree, signif )
 med_amr = get_median_per_cluster("results/resfinder.csv", "resistance genes")
-grid.arrange(A, B, layout_matrix = lay)
-
+grid.arrange(A, B)
+B
 
 ### virulence genes
 vir_file = "results/virulence.csv"
 res = read_one_file(vir_file, "virulence", "DBs/break_names/virulence.csv")
 orig_md = res[[1]]
 signif = res[[2]]
+A = res[[3]]
 colnames(orig_md)[dim(orig_md)[2]] = "vir"
-plot_on_tree(vir_file,"DBs/break_names/virulence.csv", tree, signif )
+B = plot_on_tree(vir_file,"DBs/break_names/virulence.csv", tree, signif )
 med_vir = get_median_per_cluster("results/virulence.csv", "virulence genes")
+A
 
 ### plasmids
 res = read_one_file("results/plasmid.csv", "plasmid", "DBs/break_names/virulence.csv")
 orig_md = res[[1]]
 signif = res[[2]]
+A = res[[3]]
 colnames(orig_md)[dim(orig_md)[2]] = "plasmid"
-plot_on_tree("results/plasmid.csv","DBs/break_names/plasmid.csv", tree, signif)
+B = plot_on_tree("results/plasmid.csv","DBs/break_names/plasmid.csv", tree, signif)
 med_plasmid = get_median_per_cluster("results/plasmid.csv", "plasmid replicons")
+B
+A
 
 ### plot a 3-way scatter plot to see the relationships between having any of these genes
 
@@ -221,14 +258,16 @@ med_plasmid = get_median_per_cluster("results/plasmid.csv", "plasmid replicons")
 med = data.frame(cluster = names(med_amr),
                  amr = med_amr,
                  vir= med_vir, plasmid = med_amr, stringsAsFactors = F)
-A = ggplot(med, aes(x = med_plasmid, y = med_amr, label = cluster)) + geom_text(position=position_jitter(width=0.4,height=0.4))+
+ggplot(med, aes(x = med_plasmid, y = med_amr, label = cluster)) + geom_text(position=position_jitter(width=0.4,height=0.4))+
   theme_bw(base_size = 14) + xlab("Median plasmid replicons per isolate") + ylab("Median resistance genes per isolate")
 
-B = ggplot(med, aes(x = med_plasmid, y = med_vir, label = cluster)) + geom_text(position=position_jitter(width=0.4,height=0.4))+
+ggplot(med, aes(x = med_plasmid, y = med_vir, label = cluster)) + geom_text(position=position_jitter(width=0.4,height=0.4))+
   theme_bw(base_size = 14) + xlab("Median plasmid replicons per isolate") + ylab("Median virulence genes per isolate")
 
-C = ggplot(med, aes(x = med_amr, y = med_vir, label = cluster)) + geom_text(position=position_jitter(width=0.4,height=0.4))+
+ggplot(med, aes(x = med_amr, y = med_vir, label = cluster)) + geom_text(position=position_jitter(width=0.4,height=0.4))+
   theme_bw(base_size = 14) + xlab("Median resistance genes per isolate") + ylab("Median virulence genes per isolate")
+
+
 
 
 ## rewriting the metadata nicely:

@@ -34,7 +34,7 @@ for (curr in unique(clusters)) {
 #   }
 # }
 # write.table(res, file = "class_per_isolate.csv", sep = ",", row.names = F, col.names = T, quote = F) ## randomly using only 15 per cluster
-
+res = read.table(file = "class_per_isolate.csv", sep = ",", header = T, stringsAsFactors = F, comment.char = "", quote = "")
 summarised = aggregate(.~cluster+desc, res, mean)
 ## add the phylogroup information from the graphics file
 graphics = read.table("/Users/gh11/Submissions/my_thesis/Chapter3/figures/cluster_graphics.csv", sep = ",",
@@ -42,11 +42,10 @@ graphics = read.table("/Users/gh11/Submissions/my_thesis/Chapter3/figures/cluste
 summarised = cbind(summarised, phylogroup= graphics$Phylogroup[match(summarised$cluster, graphics$Cluster)])
 summarised$cluster = as.character(unique(summarised$cluster))
 summarised$desc = factor(summarised$desc, rev(unique(classification$V2)))
-# B = ggplot(summarised, aes(x = cluster, y = count, fill = desc)) + geom_bar(stat = "identity", color= "black") +
-#   theme_classic(base_size = 12) + scale_fill_manual(values = rev(unique(classification$V3)), guide = F) +
-#   facet_grid(. ~ phylogroup, scales='free',switch = "x", space = "free_x") 
-# 
-#
+B = ggplot(summarised, aes(x = cluster, y = count, fill = desc)) + geom_bar(stat = "identity", color= "black") +
+  theme_classic(base_size = 12) + scale_fill_manual(values = rev(unique(classification$V3)), guide = F) +
+  facet_grid(. ~ phylogroup, scales='free',switch = "x", space = "free_x")
+B
 
 
 summarised_all = aggregate(by = list(summarised$desc), x = summarised$count, mean)
@@ -69,7 +68,7 @@ B = ggplot(summarised_all,aes(fill = summarised_all$Group.1, x= "", y = summaris
     panel.grid=element_blank(),
     axis.ticks = element_blank()) +
   theme(axis.text.x=element_blank()) 
-
+B
 legend = as_ggplot(get_legend(A))
 A = A + theme(legend.position = "None")
 A = A + ggtitle("A")

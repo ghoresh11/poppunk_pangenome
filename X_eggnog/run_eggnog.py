@@ -36,8 +36,8 @@ for d in input_dirs:
         lsf_prefix = ["bsub", "-q", queue, "-J", job_name, "-G", "team216", "-o", job_name + ".o",
                       "-e", job_name + ".e", '-R"select[mem>' + mem + '] rusage[mem=' + mem + '] span[hosts=1]"', '-M' + mem, "-n" + threads]
 
-        command = ["emapper.py", "-d", "bact", "--data_dir", "/lustre/scratch118/infgen/pathogen/pathpipe/eggnogmapper",
+        command = ["emapper.py", "-d", "bact", "--dmnd_db", "/nfs/pathogen/eggnog/eggnog_proteins_v9.dmnd",
                    "--output", os.path.join("eggnog", job_name), "-m", "diamond", "-i", fasta_file, "--cpu", threads]
-
+## emapper.py -d bact --dmnd_db /nfs/pathogen/eggnog/eggnog_proteins_v9.dmnd --data_dir /nfs/pathogen/eggnog/ --output test -m diamond -i Real_core_prot.fa --cpu 1
         #print(" ".join(lsf_prefix + command))
         subprocess.call(lsf_prefix + command)

@@ -244,7 +244,7 @@ def minimise_large_cluster_1(nodes, orig_roary_dirs):
             if d.split("/")[-1].split("_")[0] == str(curr_cluster):
                 ref_dir = d
                 break
-        with open(os.path.join(ref_dir, prefix + "pan_genome_reference.fa")) as handle:
+        with open(os.path.join(ref_dir, prefix + "longest_pan_genome_reference.fa")) as handle:
             for values in SimpleFastaParser(handle):
                 name = values[0].split()[1]
                 if name in members_per_cluster[curr_cluster]:
@@ -400,7 +400,7 @@ def snp_distance_split(G, orig_roary_dirs):
                 if d.split("/")[-1].split("_")[0] == str(curr_cluster):
                     ref_dir = d
                     break
-            with open(os.path.join(ref_dir, prefix + "pan_genome_reference.fa")) as handle:
+            with open(os.path.join(ref_dir, prefix + "longest_pan_genome_reference.fa")) as handle:
                 for values in SimpleFastaParser(handle):
                     name = values[0].split()[1]
                     if name in members_per_cluster[curr_cluster]:

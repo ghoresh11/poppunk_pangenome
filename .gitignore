@@ -37,7 +37,6 @@ X_eggnog/*.csv
 4_pairwise_roary/030519/
 4_pairwise_roary/180619/
 4_pairwise_roary/networks.cys
-4_pairwise_roary/*/*.csv
 4_pairwise_roary/*.csv
 4_pairwise_roary/specific_genes/
 4_pairwise_roary/snp_trees/
@@ -45,9 +44,12 @@ X_eggnog/*.csv
 4_pairwise_roary/*0919*/
 4_pairwise_roary/identical.tab
 4_pairwise_roary/classify_genes/*.csv
-4_pairwise_roary/classify_genes/interpro_scan*
-4_pairwise_roary/classify_genes/eggnog*
-4_pairwise_roary/classify_genes/sequences/*
+
+5_classify_genes/interpro_scan*
+5_classify_genes/eggnog*
+5_classify_genes/sequences/*
+5_classify_genes/props/*
+5_classify_genes/*.csv
 *entry.list*
 *.gml
 

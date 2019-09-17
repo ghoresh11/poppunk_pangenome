@@ -53,18 +53,10 @@ X_eggnog/*.csv
 *entry.list*
 *.gml
 
-5.0_run_panaroo/panaroo_vs_roary/cluster30*
-5.0_run_panaroo/panaroo_vs_roary/*.csv
-5.0_run_panaroo/presence_absence/
-5.0_run_panaroo/*.pdf
-5.0_run_panaroo/*.csv
 
-
-5.1_panaroo_merge/*.gml
-5.1_panaroo_merge/weird/*
-!5.1_panaroo_merge/weird/*.py
-5.1_panaroo_merge/*.csv
-5.1_panaroo_merge/*dbscan
+6_missing_specific_genes/*/*.fa
+6_missing_specific_genes/*.csv
+6_missing_specific_genes/*.xlsx
 
 6_AMR_vir_plasmid/results/
 6_AMR_vir_plasmid/smaller_tree/*.gff

@@ -6,48 +6,6 @@ library(gridExtra)
 
 setwd("/Users/gh11/poppunk_pangenome/4_pairwise_roary/missing_specific_genes/")
 
-### FUNCTIONS ####
-
-plot_on_tree <- function(m, tree){
-  
-  rownames(res) = res[,1]
-  res = res[,-1]
-  res = res[match(tree$tip.label, rownames(res)),]
-  
-  ## change the order of the columns
-  res = res[,order(colSums(res), decreasing = T)]
-  res = res[,-which(sapply(FUN = max, X = res)<0.1)] ## to remove very rare genes
-  
-  descs = read.table(desc_file, sep = ",", header = T, stringsAsFactors = F, quote = "")
-  new_labs = descs$gene[match(colnames(res), descs$identifier)]
-  labs = c()
-  for (l in new_labs) {
-    while (l %in% labs) {
-      l = paste(l, "^", sep = "")
-    }
-    labs = c(labs,l)
-  }
-  colnames(res) = labs
-  col.order <- rev(hclust(dist(t(res)))$order)
-  res = res[,col.order]
-  
-  tip_labels = tree$tip.label
-  for (i in 1:length(tip_labels)) {
-    if (tip_labels[i] %in% signif){
-      tip_labels[i] = paste(tip_labels[i], "*", sep = "")
-    }
-  }
-  tree$tip.label = tip_labels
-  rownames(res) = tip_labels
-  p = ggtree(tree)  +
-    theme(legend.position="right") + geom_tiplab(align = T)
-  # tree$tip.label = factor(tree$tip.label, tree$tip.label)
-  p2 = gheatmap(p = p, data = res, offset = 0.1, width=5, color = "black", 
-                high = "#023858", low = "#fff7fb", colnames_angle = 90, colnames = T, colnames_position = "bottom",
-                font.size = 3)
-  return(p2)
-}
-
 
 #### MAIN ####
 
@@ -84,26 +42,38 @@ missing = cbind(missing, is_wrong = missing_is_wrong_split)
 
 phylogroup_order =  c("B2", "F", "D","E","A","C","B1","U")
 
-
 specific$cluster = as.character(specific$cluster)
 specific$phylogroup = factor(specific$phylogroup,phylogroup_order)
 specific = specific[-which(specific$is_wrong == "Yes"),]
 ggplot(specific, aes(x = cluster)) + geom_bar() + theme_classic(base_size = 12)  + 
   ylab("Genes") + xlab("PopPUNK cluster") + scale_y_continuous(expand = c(0.01,0,0.1,0)) + 
   facet_grid(~phylogroup, scales = "free",  space = "free",switch = "x") + theme(axis.text.x = element_text(angle = 90, hjust = 1))
- 
 
+
+### plotting heatmaps of genes along the tree
+tree = read.tree("/Users/gh11/poppunk_pangenome//6_AMR_vir_plasmid/smaller_tree/raxml_tree_mod.nwk")
+tree = root(tree,outgroup = "NC_011740")
+tree = drop.tip(tree, tip =  "NC_011740")
+is_tip <- tree$edge[,2] <= length(tree$tip.label)
+ordered_tips <- tree$edge[is_tip, 2]
+o = tree$tip.label[ordered_tips]
+o = paste("X",o, sep = "")
 
 ## Check how many genes are in the functional groups I defined and which members they have
-functional_groups = read.table("specific_functional_clusters.csv", header = T, comment.char = "",
+functional_groups = read.table("specific_functional_clusters_detailed.csv", header = T, comment.char = "",
                                stringsAsFactors = F, sep = ",")
 
 ## total number of enriched genes that are also in a functional group
-sum(rowSums(functional_groups[,4:50])) / dim(specific)[1]
-functional_groups.m = melt(functional_groups[,c(2,4:50)])
-ggplot(functional_groups.m, aes(x = Common_terms, y = variable, fill = value)) + geom_tile(color = "black") + 
-  scale_fill_gradient(low = "white", high = "black")
+o = o[-which(!o %in% colnames(functional_groups))]
+sum(rowSums(functional_groups[,5:50])) / dim(specific)[1]
+functional_groups.m = melt(functional_groups, id.vars = c("CC","Common_terms", "Title","Cat"))
+functional_groups.m$variable = factor(functional_groups.m$variable, o)
+#functional_groups.m$Common_terms = factor(functional_groups.m$Common_terms, functional_groups.m$Common_terms)
 
+ggplot(functional_groups.m, aes(x = Common_terms, y = variable, fill = value)) + geom_tile(color = "black") + 
+  scale_fill_gradient(low = "white", high = "black",limits = c(0,5)) +
+  facet_grid(~Cat, scales = "free",  space = "free",switch = "x") + theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_x_discrete(labels = rep("",dim(functional_groups.m)[1])) 
 
 
 missing$cluster = as.character(missing$cluster)

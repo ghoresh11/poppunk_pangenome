@@ -78,6 +78,11 @@ X_choose_reps/*.csv
 ## the virulenceFinder,RESfinder and PHASTER databases
 DBs/
 
+
+X_gene_properties/
+X_panaroo_merge/
+X_run_panaroo/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

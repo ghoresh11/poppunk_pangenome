@@ -4,9 +4,9 @@ library(gridExtra)
 library(data.table)
 library(ggpubr)
 
-setwd("/Users/gh11/poppunk_pangenome/4_pairwise_roary/classify_genes/")
+setwd("/Users/gh11/poppunk_pangenome/5_classify_genes/")
 
-complete_presence_absence = fread("../040919_eps0.5_nodupl/complete_presence_absence.csv", sep = ",", header = T, stringsAsFactors = F)
+complete_presence_absence = fread("../4_pairwise_roary/190919_longestrep//complete_presence_absence.csv", sep = ",", header = T, stringsAsFactors = F)
 classification = read.table("gene_classification.csv", sep = "\t", header = F, stringsAsFactors = F, comment.char = "", quote = "")
 
 strains = colnames(complete_presence_absence)[-1]
@@ -36,13 +36,14 @@ for (curr in unique(clusters)) {
 # write.table(res, file = "class_per_isolate.csv", sep = ",", row.names = F, col.names = T, quote = F) ## randomly using only 15 per cluster
 res = read.table(file = "class_per_isolate.csv", sep = ",", header = T, stringsAsFactors = F, comment.char = "", quote = "")
 summarised = aggregate(.~cluster+desc, res, mean)
+
 ## add the phylogroup information from the graphics file
 graphics = read.table("/Users/gh11/Submissions/my_thesis/Chapter3/figures/cluster_graphics.csv", sep = ",",
                       header = T, comment.char = "")
 summarised = cbind(summarised, phylogroup= graphics$Phylogroup[match(summarised$cluster, graphics$Cluster)])
 summarised$cluster = as.character(unique(summarised$cluster))
 summarised$desc = factor(summarised$desc, rev(unique(classification$V2)))
-B = ggplot(summarised, aes(x = cluster, y = count, fill = desc)) + geom_bar(stat = "identity", color= "black") +
+B = ggplot(summarised, aes(x = cluster, y = count, fill = desc)) + geom_bar(stat = "identity", color= "black", size = 0.2) +
   theme_classic(base_size = 12) + scale_fill_manual(values = rev(unique(classification$V3)), guide = F) +
   facet_grid(. ~ phylogroup, scales='free',switch = "x", space = "free_x")
 B
@@ -58,7 +59,7 @@ total_lineage_specific = sum(summarised_all$x[8:10])/ sum(summarised_all$x) * 10
 total_varied = sum(summarised_all$x[4:7])/ sum(summarised_all$x) * 100
 total_rare_inter  = sum(summarised_all$x[1:3])/ sum(summarised_all$x) * 100
 
-B = ggplot(summarised_all,aes(fill = summarised_all$Group.1, x= "", y = summarised_all$x))+ geom_bar(stat = "identity", color = "black") + 
+B1 = ggplot(summarised_all,aes(fill = summarised_all$Group.1, x= "", y = summarised_all$x))+ geom_bar(stat = "identity", color = "black") + 
   coord_polar("y", start=0) +
   scale_fill_manual(values = summarised_all$col, guide = F) +  theme_minimal()+
   theme(
@@ -68,12 +69,14 @@ B = ggplot(summarised_all,aes(fill = summarised_all$Group.1, x= "", y = summaris
     panel.grid=element_blank(),
     axis.ticks = element_blank()) +
   theme(axis.text.x=element_blank()) 
-B
+B1
 legend = as_ggplot(get_legend(A))
 A = A + theme(legend.position = "None")
 A = A + ggtitle("A")
-B = B + ggtitle("B")
-grid.arrange(A,B,legend, layout_matrix = rbind(c(1,2),
+B1 = B1 + ggtitle("B")
+B = B + ggtitle("C")
+grid.arrange(A,B1,B, layout_matrix = rbind(c(1,2),
+                                               c(3,3),
                                                c(3,3)))
 
              

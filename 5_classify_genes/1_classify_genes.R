@@ -2,12 +2,12 @@ library(ggplot2)
 library(RColorBrewer)
 library(gridExtra)
 
-setwd("/Users/gh11/poppunk_pangenome/4_pairwise_roary/classify_genes/")
+setwd("/Users/gh11/poppunk_pangenome/5_classify_genes/")
 
 ## classify genes according to their distribution pattern and see if there
 ## is a composition of genes which are "universal" to E. coli, or specific to 
 ## a PopPUNK cluster
-gene_classes = read.table("../040919_eps0.5_nodupl/gene_classes.csv", sep = ",", comment.char = "", header = T, 
+gene_classes = read.table("../4_pairwise_roary/190919_longestrep//gene_classes.csv", sep = ",", comment.char = "", header = T, 
                           stringsAsFactors = F, quote = "", row.names = 1)
 gene_classes = cbind(gene_classes, total = rowSums(gene_classes))
 
@@ -64,21 +64,23 @@ missing_in_one = rownames(other)[which(other$core == 46)]
 
 
 ## create classification table for all the genes
-all = list(complete_core, ubiq_almost_core,
-           missing_in_one, mostly_specific, sometimes_specific, occasional_specific, rarely_specific, core_and_specific,
-           intermediate_and_specific, inter_multiclade, rare_and_specific, rare_but_multiclade,
-           inter_and_rare, rarely_varied, occasional_varied, sometimes_varied,mostly_varied)
+all = list(complete_core, ubiq_almost_core, missing_in_one,
+          mostly_specific, sometimes_specific, occasional_specific, rarely_specific, core_and_specific,
+          inter_multiclade, intermediate_and_specific,  rare_but_multiclade, rare_and_specific,
+          mostly_varied,  sometimes_varied,occasional_varied,  rarely_varied, inter_and_rare)
+names = c("Real_core", "Ubiquitous","Missing_in_one",
+               "40-45 core-specific", "25-39 core-specific", "10-24 core-specific", "2-9 core-specific", "Cluster core-specific",
+               "Multicluster intermediate", "Cluster intermediate-specific", "Multicluster rare", "Cluster rare-specific",
+               "40-46 varied", "25-39 varied", "10-24 varied", "2-9 varied", "Intermediate and rare")
+sub_cat = c(rep("Core", 3), rep("Specific Core", 5), rep("Intermediate", 2), rep("Rare", 2), rep("Varied",5))
+cols = c(rev(brewer.pal(n=4, "Blues")[-1]), rev(brewer.pal(n = 6, "Purples")[-1]),
+         rev(brewer.pal(n = 3, "Reds")[-1]),  rev(brewer.pal(n = 3, "Oranges")[-1]),
+         rev(brewer.pal(n = 5, "Greens")))
 
-df = read.table("descs_template.csv", sep = ",", header = T, comment.char = "", stringsAsFactors = F)
-core_cols = rev(brewer.pal(n=4, "Blues")[-1])
-core_specific = brewer.pal(n = 6, "Purples")[-1]
-inter_cols = brewer.pal(n = 3, "Reds")[-1]
-rare_cols = brewer.pal(n = 3, "Oranges")[-1]
-varied = brewer.pal(n = 5, "Greens")
-df = cbind(df, Color = c(core_cols, core_specific, inter_cols, rare_cols, varied))
-
-df$Cat = factor(df$Cat, rev(c("Core","Core Specific","Intermediate","Rare","Varied")))
-df$Name = factor(df$Name, df$Name)
+df = data.frame(Name = names, Cat = sub_cat, Count = unlist(lapply(FUN = length, all)), Color = cols)
+write.table(df, file = "descs_template.csv", sep = ",", quote = F, row.names = F, col.names = T)
+df$Cat = factor(df$Cat, rev(c("Core","Specific Core","Intermediate","Rare","Varied")))
+df$Name = factor(df$Name, as.character(df$Name))
 df$Count = as.numeric(df$Count)
 df$Color = as.character(df$Color)
 A = ggplot(df, aes(x = Cat, fill = Name, y= Count)) + geom_bar(stat = "identity", color = "black") +

@@ -11,7 +11,7 @@ for fasta_file in files:
     mem = "8000"
     threads = "16"
 
-    complete = ["10_24_varied_prot"]
+    complete = []
     ## skip what had already completed
     if job_name in complete:
         continue

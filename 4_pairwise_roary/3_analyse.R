@@ -12,36 +12,16 @@ variable_order = c("rare","inter", "core")
 ## graphics
 graphics = read.table("/Users/gh11/Submissions/my_thesis/Chapter3/figures/cluster_graphics.csv", sep = ",",
                       header = T, comment.char = "", stringsAsFactors = F)
-
-### plotting heatmaps of genes along the tree
-tree = read.tree("../6_AMR_vir_plasmid/smaller_tree/raxml_tree_mod.nwk")
-tree = root(tree,outgroup = "NC_011740")
-tree = drop.tip(tree, tip =  "NC_011740")
-is_tip <- tree$edge[,2] <= length(tree$tip.label)
-ordered_tips <- tree$edge[is_tip, 2]
-o = tree$tip.label[ordered_tips]
-
-freqs = read.table("040919_eps0.5_nodupl/freqs.csv", header = T,row.names = 1,
+freqs = read.table("190919_longestrep//freqs.csv", header = T,row.names = 1,
                    stringsAsFactors = F, comment.char = "", quote = "", sep =",")
 clusters = sapply(X = colnames(freqs), FUN = gsub, pattern = "X", replacement = "")
-o = o[which(o %in% clusters)]
-# freqs2 = reado .table("040919_eps0.5/freqs.csv", header = T,row.names = 1,
-#                     stringsAsFactors = F, comment.char = "", quote = "", sep =",")
-# for (i in 1:47){
-#   if (length(which(freqs[,i] != freqs2[,i]))>0){
-#     plot(freqs[,i],freqs2[,i], main = colnames(freqs)[i])
-#   }
-# }
-## removing the duploicates using MASH doesn't change anything so drastically
-
-graphics = graphics[match(o, graphics$Cluster),]
-
-
+graphics = graphics[match(clusters, graphics$Cluster),]
+o = clusters
 
 for_pca = t(freqs)
 remove = c()
 for (i in 1:dim(for_pca)[2]) {
-  if (length(unique(for_pca[,i])) == 1) {
+  if (length(unique(for_pca[,i])) == 1) { ## no variation in gene
     remove = c(remove, i)
   }
 }
@@ -54,11 +34,11 @@ freqs.pca = cbind(freqs.pca, Cluster = as.character(o))
 freqs.pca$Cluster = factor(freqs.pca$Cluster, o)
 
 ## PCA plot
-B =  ggplot(freqs.pca, aes(x = PC2, y = PC3, color = Cluster, shape = Cluster)) + geom_point(size = 3.5, stroke = 1, alpha = 0.7) +
+ggplot(freqs.pca, aes(x = PC3, y = PC2, color = Cluster, shape = Cluster)) + geom_point(size = 3.5, stroke = 1, alpha = 0.7) +
   scale_color_manual(values = graphics$Color, guide = F) + theme_bw(base_size = 12) +
   geom_text(aes(label=Cluster),hjust=-0.3, vjust=-0.3) +
-  scale_shape_manual(values =  graphics$Shape, guide = F) + ggtitle("C") + scale_x_continuous(expand = c(0.03,0.03))+
-  scale_y_continuous(expand = c(0.02,0.02))  + 
+  scale_shape_manual(values =  graphics$Shape, guide = F) + ggtitle("C")+ scale_x_continuous(expand = c(0.03,0.03))+
+  scale_y_continuous(expand = c(0.02,0.02))  
    annotate("text", x = -0.05, y = 0.1 , label = "bold(A/B1)", size = 5, parse = T) + 
    annotate("text", x = -0.05, y = -0.12 , label = "bold(E)", size = 5,parse = T)+ 
    annotate("text", x = 0.05, y = -0.16 , label = "bold(F)", size = 5,parse = T)+ 
@@ -78,22 +58,22 @@ B =  ggplot(freqs.pca, aes(x = PC2, y = PC3, color = Cluster, shape = Cluster)) 
 #   gene_classes$inter[i] = length(which(curr_vec < 0.95 & curr_vec >= 0.15))
 #   gene_classes$rare[i] =  length(which(curr_vec < 0.15 & curr_vec > 0))
 # }
-# write.table(x = gene_classes, file  = "040919_eps0.5_nodupl/gene_classes.csv", sep = ",", col.names = T, row.names = F, quote = F)
+# write.table(x = gene_classes, file  = "190919_longestrep/gene_classes.csv", sep = ",", col.names = T, row.names = F, quote = F)
 
-gene_classes = read.table("040919_eps0.5_nodupl/gene_classes.csv", sep = ",", header = T, stringsAsFactors = F, comment.char = "", quote = "", row.names = 1)
+gene_classes = read.table("190919_longestrep/gene_classes.csv", sep = ",", header = T, stringsAsFactors = F, comment.char = "", quote = "", row.names = 1)
 gene_classes = cbind(gene_classes, total_presence = rowSums(gene_classes))
 total_presence = data.frame(table(gene_classes$total_presence))
 
 
 
 ## examples of genes
-gene_name = "intA_1" ## change here to check the frequency of a gene across the popPUNK clusters
+gene_name = "tolA" ## change here to check the frequency of a gene across the popPUNK clusters
 curr = data.frame(name = o,
                   freq = unlist(freqs[which(rownames(freqs) == gene_name),]), stringsAsFactors = F)
 curr$name = factor(curr$name, o)
-intA = ggplot(curr, aes(x = name, y = freq)) + geom_bar(stat = "identity") +
+ggplot(curr, aes(x = name, y = freq)) + geom_bar(stat = "identity") +
   scale_y_continuous(limits = c(0,1), expand = c(0,0)) + theme_bw(base_size = 12) + theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-  ylab("Frequency") + xlab("PopPUNK cluster") + ggtitle("A - IntA")
+  ylab("Frequency") + xlab("PopPUNK cluster") + geom_hline(yintercept = 0.9, col = "red")
 
 
 gene_name = "wzyE" ## change here to check the frequency of a gene across the popPUNK clusters
@@ -176,8 +156,7 @@ plot_for_num <- function(num, p, lay){
 
 
 ## genes which are missing only in one cluster
-missing_in_one = gene_classes[which((gene_classes$total_presence == 46 & gene_classes$core == 46) | 
-                                      (gene_classes$total_presence == 47 & gene_classes$core == 46)),]
+missing_in_one = gene_classes[which(gene_classes$total_presence == 46 & gene_classes$core == 46),]
 missing_in_one = rownames(missing_in_one)
 ## for the ubiq genes, which clusters are they missing from
 missing_in_one = freqs[which(rownames(freqs) %in% missing_in_one),]
@@ -196,7 +175,7 @@ summary_depleted$cluster =  sapply(summary_depleted$cluster, FUN = gsub, pattern
 summary_depleted = cbind(summary_depleted, phylogroup = graphics$Phylogroup[match(summary_depleted$cluster, graphics$Cluster)])
 summary_depleted$cluster = factor(summary_depleted$cluster, rev(graphics$Cluster))
 summary_depleted$phylogroup = factor(summary_depleted$phylogroup, c("B2", "F", "D","E","A","C","B1","U"))
-write.table(summary_depleted, file = "missing_specific_genes/depleted_genes.csv", sep = ",", col.names = T, row.names = F, quote = F)
+write.table(summary_depleted, file = "../6_missing_specific_genes/missing_genes.csv", sep = ",", col.names = T, row.names = F, quote = F)
 
 p1 = ggplot(summary_depleted, aes(x = cluster, y = num_genes)) + geom_bar(stat = "identity") + theme_classic(base_size = 12)  + 
   ylab("Genes") + xlab("PopPUNK cluster") + scale_y_continuous(expand = c(0.01,0,0.1,0))+
@@ -236,7 +215,7 @@ summary_specific$cluster =  sapply(summary_specific$cluster, FUN = gsub, pattern
 summary_specific = cbind(summary_specific, phylogroup = graphics$Phylogroup[match(summary_specific$cluster, graphics$Cluster)])
 summary_specific$cluster = factor(summary_specific$cluster, rev(graphics$Cluster))
 summary_specific$phylogroup = factor(summary_specific$phylogroup, c("B2", "F", "D","E","A","C","B1","U"))
-write.table(summary_specific, file = "missing_specific_genes/specific_genes.csv", sep = ",", col.names = T, row.names = F, quote = F)
+write.table(summary_specific, file = "../6_missing_specific_genes//specific_genes.csv", sep = ",", col.names = T, row.names = F, quote = F)
 
 p2 = ggplot(summary_specific, aes(x = cluster, y = num_genes)) + geom_bar(stat = "identity") + theme_classic(base_size = 12)  + 
   ylab("Genes") + xlab("PopPUNK cluster") + scale_y_continuous(expand = c(0.01,0,0.1,0))+
@@ -248,10 +227,27 @@ lay2 = rbind(c(1,3,3,3),
             c(4,4,4,NA))
 plot_for_num(1, p2, lay2)
 
-p2
-p1
 
-grid.arrange(p1,p2, nrow = 2)
 
 ## relationship between number of depleted genes vs number of enriched genes
-plot(summary_depleted$num_genes, summary_specific$num_genes)
+
+df = data.frame(cluster = summary_depleted$cluster,
+                missing = summary_depleted$num_genes, specific = summary_specific$num_genes, stringsAsFactors = F)
+lin = ggplot(df, aes(x = missing, y = specific)) + geom_point(alpha = 0.6, size = 1.4) +
+  theme_classic(base_size = 14) +geom_text(aes(label=cluster),hjust=0, vjust=0) +
+  xlab("Missing genes") + ylab("Specific genes")+ 
+  geom_smooth(method='lm', col = 'black') + scale_x_continuous(expand = c(0.01,0,0,4))
+
+
+f <- function(x){
+  return(18.0007  + 5.9462*x)
+}
+plot(sapply(FUN = f, X = seq(from = 0, to = 37, by = 1)))
+
+mean(df$missing)
+max(df$missing)
+max(df$specific)
+
+ubiq = gene_classes[which(gene_classes$total == 47,),]
+specific = gene_classes[which(gene_classes$total == 1,),]
+

@@ -244,7 +244,7 @@ def minimise_large_cluster_1(nodes, orig_roary_dirs):
             if d.split("/")[-1].split("_")[0] == str(curr_cluster):
                 ref_dir = d
                 break
-        with open(os.path.join(ref_dir, prefix + "longest_pan_genome_reference.fa")) as handle:
+        with open(os.path.join(ref_dir, prefix + "mode_pan_genome_reference.fa")) as handle:
             for values in SimpleFastaParser(handle):
                 name = values[0].split()[1]
                 if name in members_per_cluster[curr_cluster]:
@@ -252,7 +252,7 @@ def minimise_large_cluster_1(nodes, orig_roary_dirs):
                     tmp_out.write(">" + curr_cluster + "_" + name + "\n" + values[1].split(";")[0] + "\n")
     tmp_out.close()
     ## run cdhit to reduce the number of sequences
-    p = subprocess.Popen(["cd-hit-est", "-i", "1_cluster_fasta.fa","-o","1_cluster_clustered.fa", "-c","0.95", "-T", "4", "-d", "0","-A", "0.95", "-n", "10", "-s", "0.95"])
+    p = subprocess.Popen(["cd-hit-est", "-i", "1_cluster_fasta.fa","-o","1_cluster_clustered.fa", "-c","0.9", "-T", "4", "-d", "0","-A", "0.9", "-n", "8", "-s", "0.9"])
     p.wait()
     nodes_to_remove = []
     with open("1_cluster_clustered.fa.clstr") as f:
@@ -400,7 +400,7 @@ def snp_distance_split(G, orig_roary_dirs):
                 if d.split("/")[-1].split("_")[0] == str(curr_cluster):
                     ref_dir = d
                     break
-            with open(os.path.join(ref_dir, prefix + "longest_pan_genome_reference.fa")) as handle:
+            with open(os.path.join(ref_dir, prefix + "mode_pan_genome_reference.fa")) as handle:
                 for values in SimpleFastaParser(handle):
                     name = values[0].split()[1]
                     if name in members_per_cluster[curr_cluster]:
@@ -658,7 +658,7 @@ def get_options():
                         type=str, default =  "/lustre/scratch118/infgen/team216/gh11/e_coli_collections/poppunk/new_roary/",
                         help='path to original roary input directory for each cluster [%(default)s]')
     parser.add_argument('--input_dir_2', required=False,
-                        type=str, default =  "/lustre/scratch118/infgen/team216/gh11/e_coli_collections/poppunk/new_roary/pairwise/",
+                        type=str, default =  "/nfs/pathogen004/gh11/pairwise/",
                         help='path to pairwise roary directory [%(default)s]')
     return parser.parse_args()
 

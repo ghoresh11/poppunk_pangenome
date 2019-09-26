@@ -7,7 +7,7 @@ library(reshape2)
 library(ape)
 
 ######## General things ###########
-setwd("/Users/gh11/poppunk_pangenome/6_AMR_vir_plasmid/")
+setwd("/Users/gh11/poppunk_pangenome/7_AMR_vir_plasmid//")
 
 orig_md = read.table("/Users/gh11/e_colis/FILTERED_MD_FINAL_ALL.tab", sep = "\t",
                      header = T, comment.char = "", quote = "", stringsAsFactors = F)

@@ -54,11 +54,12 @@ X_eggnog/*.csv
 *.gml
 
 
-6_missing_specific_genes/*/*.fa
-6_missing_specific_genes/*fa
+6_missing_specific_genes/*/*.fa.*
+6_missing_specific_genes/*fa*
 6_missing_specific_genes/*.csv
 6_missing_specific_genes/*.xlsx
 6_missing_specific_genes/*.tab
+6_missing_specific_genes/groups/
 
 7_AMR_vir_plasmid/results/
 7_AMR_vir_plasmid/smaller_tree/*.gff

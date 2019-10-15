@@ -50,7 +50,7 @@ X_eggnog/*.csv
 5_classify_genes/eggnog*
 5_classify_genes/sequences/*
 5_classify_genes/props/*
-5_classify_genes/*.csv
+5_classify_genes/*csv
 5_classify_genes/prev*
 
 *entry.list*
@@ -63,6 +63,11 @@ X_eggnog/*.csv
 6_missing_specific_genes/*.xlsx
 6_missing_specific_genes/*.tab
 6_missing_specific_genes/groups/
+6_missing_specific_genes/stories/*.fa
+6_missing_specific_genes/stories/*csv
+6_missing_specific_genes/stories/*/*csv
+6_missing_specific_genes/stories/*/*fa
+6_missing_specific_genes/stories/*/*gff
 
 7_AMR_vir_plasmid/results/
 7_AMR_vir_plasmid/smaller_tree/*.gff

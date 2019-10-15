@@ -93,6 +93,7 @@ def set_specific_type(merged_graph, specific_type, key, new_type, missing = "NA"
     Basically wrong>truncated/missing>same functional group'''
     s_key = "S-" + re.sub(r"[^a-zA-Z0-9_\*-]+", '', key)
     m_key = "M-" + re.sub(r"[^a-zA-Z0-9_\*-]+", '', missing)
+
     if "property" not in merged_graph.nodes[m_key]:
         merged_graph.nodes[m_key]["property"] = "blast"
         merged_graph.nodes[m_key]["cluster"] = "DB"
@@ -102,8 +103,9 @@ def set_specific_type(merged_graph, specific_type, key, new_type, missing = "NA"
     if new_type == "wrong" or specific_type[key]["type"] == "wrong":
         specific_type[key]["type"] = "wrong"
         merged_graph.nodes[s_key]["property"] = "wrong"
-        merged_graph.nodes[m_key]["property"] = "wrong"
-        specific_type[key]["missing"]["wrong"] = [missing]
+        if new_type == "wrong": ## update the correct partner
+            merged_graph.nodes[m_key]["property"] = "wrong"
+            specific_type[key]["missing"]["wrong"] = [missing]
         return merged_graph
 
     if new_type in ["longer","truncated"]:
@@ -210,10 +212,11 @@ def connect_both_graphs(specific, depleted):
             # if merged_graph.nodes[curr_m]["cluster"] != merged_graph.nodes[curr_s]["cluster"]:
             #     continue
 
-            if float(toks[2]) > 90 and int(toks[4]) - 20 <= int(toks[5]) and int(toks[5]) <= int(toks[4]) + 20:
+
+            if float(toks[2]) > 95 and int(toks[4]) - 20 <= int(toks[5]) and int(toks[5]) <= int(toks[4]) + 20:
                 if not merged_graph.has_edge(curr_s, curr_m):
                     merged_graph.add_edge(curr_s, curr_m, weight = "1", terms = "BLAST")
-                merged_graph = set_specific_type(merged_graph,specific_type, toks[0], "wrong", missing = toks[1])
+                merged_graph = set_specific_type(merged_graph, specific_type, toks[0], "wrong", missing = toks[1])
             elif float(toks[2]) > 95 and max(int(toks[3])/float(toks[4]),int(toks[3])/float(toks[5])) >= 0.7:
                 if not merged_graph.has_edge(curr_s, curr_m):
                     merged_graph.add_edge(curr_s, curr_m, weight = "1", terms = "BLAST-truncated")
@@ -230,16 +233,16 @@ def connect_both_graphs(specific, depleted):
         if len(component) < 2:
             continue
         ## remove terms which are rare in the connected component...
-        terms = {}
-        num_edges = 0
-        for edge in merged_graph.edges(component, data = True):
-            num_edges += 1
-            curr_terms = edge[2]["terms"].split("/")
-            for t in curr_terms:
-                if t not in terms:
-                    terms[t] = 0
-                terms[t] += 1
-        limit = np.quantile(np.array(terms.values()), 0.7)
+        # terms = {}
+        # num_edges = 0
+        # for edge in merged_graph.edges(component, data = True):
+        #     num_edges += 1
+        #     curr_terms = edge[2]["terms"].split("/")
+        #     for t in curr_terms:
+        #         if t not in terms:
+        #             terms[t] = 0
+        #         terms[t] += 1
+        # limit = np.quantile(np.array(terms.values()), 0.7)
         ## run dbscan on the cluster to seperate into groups that share a lot of terms
         ## remove edges
         curr_edges_to_remove, merged_graph = split_cluster(nx.Graph(merged_graph.subgraph(component)), merged_graph)
@@ -268,14 +271,13 @@ def connect_both_graphs(specific, depleted):
                 out.write(node[0][2:] + "," + node[1]["property"] + "," + partner + "," + node[1]["desc"].replace(",","-") + "\n")
     ## create the functional clusters output, but remove
     ## nodes that are wrong or just truncated versions (pseudogenised? wrong chosen?)
-    out = open("functional_clusters.csv","w")
-    out.write("CC,Size,Num_clusters,Clusters,Type,Common_terms\n")
     remove = []
     for n in merged_graph.nodes(data=True):
         if n[1]["property"] in ["wrong", "truncated","longer"]:
             remove.append(n[0])
     merged_graph.remove_nodes_from(remove)
     nx.write_gml(merged_graph, "post_merged_graph.gml")
+    print("Post merged graph written and complete...")
     return
 
 
@@ -292,6 +294,7 @@ def get_seqs():
 def generate_msa_output(filein):
     ''' create multiple sequence alignments for all genes
     that have some sort of relatioship'''
+    print("Generating MSAs of the functional connected components...")
     seqs = get_seqs()
     with open(filein) as f:
         for line in f:
@@ -324,5 +327,6 @@ if __name__ == "__main__":
     G2 = summarise_terms_as_network(all_depleted_terms, "missing_genes_graph.gml")
 
     connect_both_graphs(G1, G2)
+    quit()
     generate_msa_output("specific_gene_types.csv")
     quit()

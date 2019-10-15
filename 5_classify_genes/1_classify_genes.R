@@ -7,7 +7,7 @@ setwd("/Users/gh11/poppunk_pangenome/5_classify_genes/")
 ## classify genes according to their distribution pattern and see if there
 ## is a composition of genes which are "universal" to E. coli, or specific to 
 ## a PopPUNK cluster
-gene_classes = read.table("../4_pairwise_roary/190919_longestrep//gene_classes.csv", sep = ",", comment.char = "", header = T, 
+gene_classes = read.table("../4_pairwise_roary/071019_mode_rep/gene_classes.csv", sep = ",", comment.char = "", header = T, 
                           stringsAsFactors = F, quote = "", row.names = 1)
 gene_classes = cbind(gene_classes, total = rowSums(gene_classes))
 
@@ -76,6 +76,11 @@ sub_cat = c(rep("Core", 3), rep("Specific Core", 5), rep("Intermediate", 2), rep
 cols = c(rev(brewer.pal(n=4, "Blues")[-1]), rev(brewer.pal(n = 6, "Purples")[-1]),
          rev(brewer.pal(n = 3, "Reds")[-1]),  rev(brewer.pal(n = 3, "Oranges")[-1]),
          rev(brewer.pal(n = 5, "Greens")))
+cols = c(rev(brewer.pal(n=4, "Greys")[-1]), rev(brewer.pal(n = 6, "Greys")[-1]),
+         rev(brewer.pal(n = 3, "Reds")[-1]),  rev(brewer.pal(n = 3, "Greys")[-1]),
+         rev(brewer.pal(n = 5, "Greens")))
+
+
 
 df = data.frame(Name = names, Cat = sub_cat, Count = unlist(lapply(FUN = length, all)), Color = cols)
 write.table(df, file = "descs_template.csv", sep = ",", quote = F, row.names = F, col.names = T)
@@ -86,8 +91,12 @@ df$Color = as.character(df$Color)
 A = ggplot(df, aes(x = Cat, fill = Name, y= Count)) + geom_bar(stat = "identity", color = "black") +
   scale_fill_manual(values = df$Color, name = "") +
   theme_classic(base_size = 12) + ylab("Genes") + coord_flip() + scale_y_continuous(expand = c(0.01,0.01))+
-  theme(legend.position = "bottom") + xlab("")+guides(fill=guide_legend(ncol=2,byrow=F))
+  theme(legend.position = "bottom") + xlab("")+guides(fill=guide_legend(ncol=3,byrow=F))
 
+A
+legend = as_ggplot(get_legend(A))
+legend
+A = A + theme(legend.position = "None")
 A
 
 names = as.character(df$Name)

@@ -6,7 +6,7 @@ library(ggpubr)
 
 setwd("/Users/gh11/poppunk_pangenome/5_classify_genes/")
 
-complete_presence_absence = fread("../4_pairwise_roary/190919_longestrep//complete_presence_absence.csv", sep = ",", header = T, stringsAsFactors = F)
+complete_presence_absence = fread("../4_pairwise_roary/071019_mode_rep/complete_presence_absence.csv", sep = ",", header = T, stringsAsFactors = F)
 classification = read.table("gene_classification.csv", sep = "\t", header = F, stringsAsFactors = F, comment.char = "", quote = "")
 
 strains = colnames(complete_presence_absence)[-1]

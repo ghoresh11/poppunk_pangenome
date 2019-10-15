@@ -33,7 +33,7 @@ for gff_file in gff_files:
     if not gff_file.endswith("_result"):
         continue
     print(gff_file  + "...")
-    fasta_file = os.path.join(gff_file.replace("_result",""))
+    fasta_file = os.path.join("..", gff_file.replace("_result",""))
     print(fasta_file + "...")
 
     interpro_scan_ids = {}

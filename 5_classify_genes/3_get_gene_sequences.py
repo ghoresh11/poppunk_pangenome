@@ -11,7 +11,7 @@ and to find which genes are missing or enriched in specific clusters'''
 ## step 1-> get the cluster members of each gene, better to point from cluster -> member -> to gene
 print('Reading members file....')
 cluster_member_gene = {}
-with open("/lustre/scratch118/infgen/team216/gh11/e_coli_collections/poppunk/new_roary/pairwise/analysis/190919/members.csv") as f:
+with open("/lustre/scratch118/infgen/team216/gh11/e_coli_collections/poppunk/new_roary/pairwise/analysis/071019_mode_rep/members.csv") as f:
     for line in f:
         if line.startswith("Gene"):
             continue
@@ -31,7 +31,7 @@ gene_sequence = {}
 for cluster in cluster_member_gene:
     print(cluster)
     curr_members_gene = cluster_member_gene[cluster]
-    curr_ref_file = os.path.join("/lustre/scratch118/infgen/team216/gh11/e_coli_collections/poppunk/new_roary", cluster, "longest_pan_genome_reference.fa")
+    curr_ref_file = os.path.join("/lustre/scratch118/infgen/team216/gh11/e_coli_collections/poppunk/new_roary", cluster, "mode_pan_genome_reference.fa")
     with open(curr_ref_file) as handle:
         for values in SimpleFastaParser(handle):
             member = values[0].split()[-1]
@@ -42,11 +42,12 @@ for cluster in cluster_member_gene:
 ## step 3 -> read the gene classification file and create a file for each class, can concat all later.
 print("Generating outputs...")
 files_out = {}
-#with open("gene_classification.csv") as f:
-with open("soft_core_genes.txt") as f:
+with open("gene_classification.csv") as f:
+#with open("soft_core_genes.txt") as f:
     for line in f:
         toks = line.strip().split("\t")
         desc = "190919_soft_core_genes"
+        desc = toks[1]
         if len(toks)>1:
             desc = toks[1]
         as_file_name = re.sub('[^a-zA-Z0-9\n\._]', '_', desc)
@@ -59,7 +60,7 @@ for file_out in files_out:
     files_out[file_out].close()
 
 
-## run interpro-scan
+## run interpro-scan - from the prot directory
 # for f in *.fa;
 # do farm_interproscan -a $f -o ${f}_result;
 # done

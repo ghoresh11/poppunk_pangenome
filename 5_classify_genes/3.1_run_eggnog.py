@@ -7,9 +7,9 @@ for fasta_file in files:
     if not fasta_file.endswith(".fa"):
         continue    
     job_name = fasta_file.split(".")[0]
-    queue = "parallel"
-    mem = "8000"
-    threads = "16"
+    queue = "normal"
+    mem = "33000"
+    threads = "4"
 
     complete = []
     ## skip what had already completed
@@ -23,3 +23,4 @@ for fasta_file in files:
                 "--data_dir","/nfs/pathogen/eggnog/",
                "--output", os.path.join("eggnog", job_name + ".txt"), "-m", "diamond", "-i", fasta_file, "--cpu", threads]
     subprocess.call(lsf_prefix + command)
+    quit()

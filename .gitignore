@@ -46,6 +46,10 @@ X_eggnog/*.csv
 4_pairwise_roary/classify_genes/*.csv
 4_pairwise_roary/071019*
 
+4.1_correct_pan_genome/*.fa
+4.1_correct_pan_genome/*.csv
+4.1_correct_pan_genome/blast_results*
+
 5_classify_genes/interpro_scan*
 5_classify_genes/eggnog*
 5_classify_genes/sequences/*
@@ -67,7 +71,7 @@ X_eggnog/*.csv
 6_missing_specific_genes/stories/*csv
 6_missing_specific_genes/stories/*/*csv
 6_missing_specific_genes/stories/*/*fa
-6_missing_specific_genes/stories/*/*gff
+6_missing_specific_genes/stories/*/*gff*
 
 7_AMR_vir_plasmid/results/
 7_AMR_vir_plasmid/smaller_tree/*.gff

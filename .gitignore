@@ -42,6 +42,7 @@ X_eggnog/*.csv
 4_pairwise_roary/*/snp_trees/
 4_pairwise_roary/thresholds/
 4_pairwise_roary/*0919*/
+4_pairwise_roary/*2310*/
 4_pairwise_roary/identical.tab
 4_pairwise_roary/classify_genes/*.csv
 4_pairwise_roary/071019*

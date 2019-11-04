@@ -12,17 +12,15 @@ def get_gene_classification():
     ''' parse the outputs of interpro scan and ecosyc to get the functional classification
     of all the genes'''
     print("Reading gene classification into dictionary")
-    interpro_scan_folder = "/Users/gh11/poppunk_pangenome/5_classify_genes/interpro_scan_results/"
-    interpro_scan_files = os.listdir(interpro_scan_folder)
+    interpro_scan_file = "/Users/gh11/poppunk_pangenome/5_classify_genes/interproscan_results.csv"
     gene_classification = {}
-    for f in interpro_scan_files:
-        with open(os.path.join(interpro_scan_folder,f)) as f_open:
-            for line in f_open:
-                toks = line.strip().split("\t")
-                if line.startswith("name"):
-                    header = toks[1:]
-                    continue
-                gene_classification[toks[0]] = ["-"] + toks[1:]
+    with open(interpro_scan_file) as f_open:
+        for line in f_open:
+            toks = line.strip().split("\t")
+            if line.startswith("name"):
+                header = toks[1:]
+                continue
+            gene_classification[toks[0]] = ["-"] + toks[1:]
     ## add the ecysyc results
     with open("ecosyc_results.csv") as f:
         for line in f:
@@ -87,49 +85,6 @@ def summarise_terms_as_network(all_gene_terms, out):
     nx.write_gml(G, out)
     return G
 
-def set_specific_type(merged_graph, specific_type, key, new_type, missing = "NA",desc = "-"):
-    ''' this is complicated, but there's a hierarchy in defining the property of each
-    missing or cluster specific gene, depending on their relationships
-    Basically wrong>truncated/missing>same functional group'''
-    s_key = "S-" + re.sub(r"[^a-zA-Z0-9_\*-]+", '', key)
-    m_key = "M-" + re.sub(r"[^a-zA-Z0-9_\*-]+", '', missing)
-
-    if "property" not in merged_graph.nodes[m_key]:
-        merged_graph.nodes[m_key]["property"] = "blast"
-        merged_graph.nodes[m_key]["cluster"] = "DB"
-        merged_graph.nodes[m_key]["desc"] = "NA"
-
-    orig = specific_type[key]["type"]
-    if new_type == "wrong" or specific_type[key]["type"] == "wrong":
-        specific_type[key]["type"] = "wrong"
-        merged_graph.nodes[s_key]["property"] = "wrong"
-        if new_type == "wrong": ## update the correct partner
-            merged_graph.nodes[m_key]["property"] = "wrong"
-            specific_type[key]["missing"]["wrong"] = [missing]
-        return merged_graph
-
-    if new_type in ["longer","truncated"]:
-        specific_type[key]["type"] = new_type
-        if new_type not in specific_type[key]["missing"]:
-            specific_type[key]["missing"][new_type] = set()
-        specific_type[key]["missing"][new_type].add(missing)
-
-    if specific_type[key]["type"] in ["longer","truncated"]:
-        merged_graph.nodes[s_key]["property"] = specific_type[key]["type"]
-        if merged_graph.nodes[m_key]["property"] != "wrong":
-            merged_graph.nodes[m_key]["property"] = specific_type[key]["type"]
-        return merged_graph
-
-    if new_type == "same functional group" or specific_type[key]["type"] == "same functional group":
-        specific_type[key]["type"] = "same functional group"
-        specific_type[key]["desc"] = desc
-        merged_graph.nodes[s_key]["property"] =  "same functional group"
-        if merged_graph.nodes[m_key]["property"] not in ["longer","truncated","wrong"]:
-            merged_graph.nodes[m_key]["property"] =  "same functional group"
-        specific_type[key]["missing"]["same functional group"] = [missing]
-    return merged_graph
-
-
 def split_cluster(H, merged_graph):
     ''' use dbscan to split connected components that don't make sense
     because of spurious matches
@@ -178,9 +133,7 @@ def connect_both_graphs(specific, depleted):
     '''
     print("Connecting missing and specific graphs...")
     nx.set_node_attributes(specific, "specific", "type")
-    nx.set_node_attributes(specific, "true", "property")
     nx.set_node_attributes(depleted, "missing", "type")
-    nx.set_node_attributes(depleted, "true", "property")
     merged_graph = nx.union(specific, depleted, rename=("S-", "M-"))
 
     specific_type = {} # keep track of the cluster specific genes to see if they are fake, truncated, longer, same function or completely specific
@@ -196,34 +149,6 @@ def connect_both_graphs(specific, depleted):
             intersection = list(set(n1_descs) & set(n2_descs))
             if len(intersection) > 1: ## add an edge if they share some function
                 merged_graph.add_edge("S-"+n1[0], "M-"+n2[0], weight = len(intersection), terms = "/".join(intersection))
-                merged_graph = set_specific_type(merged_graph, specific_type, n1[0], "same functional group", missing = n2[0])
-
-    ## add wrong edges using blast output
-    print("Looking for wrong/truncated/fused genes from blast...")
-    with open("specific_against_db.tab") as f:
-        for line in f:
-            toks = line.strip().split()
-            toks[0] = re.sub(r"[^a-zA-Z0-9_\*-]+", '', toks[0])
-            toks[1] = re.sub(r"[^a-zA-Z0-9_\*-]+", '', toks[1])
-            curr_m = "M-" + toks[1]
-            curr_s = "S-" + toks[0]
-            flag = False
-            ## if they are from different clusters they can't be wrong
-            # if merged_graph.nodes[curr_m]["cluster"] != merged_graph.nodes[curr_s]["cluster"]:
-            #     continue
-
-
-            if float(toks[2]) > 95 and int(toks[4]) - 20 <= int(toks[5]) and int(toks[5]) <= int(toks[4]) + 20:
-                if not merged_graph.has_edge(curr_s, curr_m):
-                    merged_graph.add_edge(curr_s, curr_m, weight = "1", terms = "BLAST")
-                merged_graph = set_specific_type(merged_graph, specific_type, toks[0], "wrong", missing = toks[1])
-            elif float(toks[2]) > 95 and max(int(toks[3])/float(toks[4]),int(toks[3])/float(toks[5])) >= 0.7:
-                if not merged_graph.has_edge(curr_s, curr_m):
-                    merged_graph.add_edge(curr_s, curr_m, weight = "1", terms = "BLAST-truncated")
-                if int(toks[4]) < int(toks[5]):
-                    merged_graph = set_specific_type(merged_graph,specific_type, toks[0], "truncated", missing = toks[1])
-                else:
-                    merged_graph = set_specific_type(merged_graph,specific_type, toks[0], "longer", missing = toks[1])
 
     ccs = sorted(nx.connected_components(merged_graph), key=len, reverse=True)
     edges_to_remove = [] ## remove edges when there are only a small number of shared terms
@@ -252,30 +177,8 @@ def connect_both_graphs(specific, depleted):
     nx.write_gml(merged_graph, "pre_merged_graph.gml")
     print("Pre merged graph written and complete...")
     merged_graph.remove_edges_from(edges_to_remove)
-    ## create the details files:
-    with open("specific_gene_types.csv", "w") as out1:
-        with open("missing_gene_types.csv","w") as out2:
-            out1.write("Gene,Type,Partner,Desc\n")
-            out2.write("Gene,Type,Partner,Desc\n")
-            for node in merged_graph.nodes(data = True):
-                if node[0].startswith("M"):
-                    out = out2
-                    partner = "NA"
-                else:
-                    out = out1
-                    if node[1]["property"] not in specific_type[node[0][2:]]["missing"]:
-                        partner = "NA"
-                    else:
-                        partner = "/".join(list(specific_type[node[0][2:]]["missing"][node[1]["property"]]))
-
-                out.write(node[0][2:] + "," + node[1]["property"] + "," + partner + "," + node[1]["desc"].replace(",","-") + "\n")
     ## create the functional clusters output, but remove
     ## nodes that are wrong or just truncated versions (pseudogenised? wrong chosen?)
-    remove = []
-    for n in merged_graph.nodes(data=True):
-        if n[1]["property"] in ["wrong", "truncated","longer"]:
-            remove.append(n[0])
-    merged_graph.remove_nodes_from(remove)
     nx.write_gml(merged_graph, "post_merged_graph.gml")
     print("Post merged graph written and complete...")
     return
@@ -326,7 +229,7 @@ if __name__ == "__main__":
     all_depleted_terms = get_detailed_functions("missing_genes.csv", "missing_genes_detailed.csv")
     G2 = summarise_terms_as_network(all_depleted_terms, "missing_genes_graph.gml")
 
-    connect_both_graphs(G1, G2)
+    connect_both_graphs(G1, G2) ## need to see where property fits in
     quit()
     generate_msa_output("specific_gene_types.csv")
     quit()

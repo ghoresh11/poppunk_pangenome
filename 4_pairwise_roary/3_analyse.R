@@ -30,25 +30,32 @@ for (i in 1:dim(for_pca)[2]) {
   }
 }
 for_pca = for_pca[,-remove]
+
+## to focus only on particular gene
+# counts = apply(FUN = function(v) length(which(v < 0.15)), 2, X = for_pca)
+# for_pca = for_pca[,which(counts==47)]
+
 ### PCA plot of the clusters -> what are the relationships between the clusters based on the frequencies of all genes
-freqs.pca = prcomp(t(for_pca) , center = T, scale. = T)
+freqs.pca = prcomp(for_pca , center = T)
 summary(freqs.pca)
-freqs.pca = data.frame(freqs.pca$rotation)
+freqs.pca = data.frame(freqs.pca$x)
 freqs.pca = cbind(freqs.pca, Cluster = as.character(o))
 freqs.pca$Cluster = factor(freqs.pca$Cluster, o)
 
 
 ## PCA plot
-B = ggplot(freqs.pca, aes(x = PC2, y = PC3, color = Cluster, shape = Cluster)) + geom_point(size = 3.5, stroke = 1, alpha = 0.7) +
+B=ggplot(freqs.pca, aes(x = PC1, y = PC2, color = Cluster, shape = Cluster)) + geom_point(size = 3.5, stroke = 1, alpha = 0.7) +
   scale_color_manual(values = graphics$Color, guide = F) + theme_bw(base_size = 12) +
   geom_text(aes(label=Cluster),hjust=-0.3, vjust=-0.3) +
-  scale_shape_manual(values =  graphics$Shape, guide = F) + ggtitle("C") +
-   annotate("text", x = 0.05, y = 0.03 , label = "A", size = 5, parse = T) + 
-     annotate("text", x = 0.16, y = 0.02 , label = "B1", size = 5, parse = T) + 
-   annotate("text", x = 0.12, y = -0.14 , label = "E", size = 5,parse = T)+ 
-   annotate("text", x = -0.08, y = -0.23 , label = "F", size = 5,parse = T)+ 
-  annotate("text", x = 0.05, y = -0.26 , label = "D", size = 5,parse = T)+ 
-   annotate("text", x = -0.2, y = 0 , label = "B2", size = 5,parse = T)
+  scale_shape_manual(values =  graphics$Shape, guide = F) + ggtitle("C")  +
+   annotate("text", x = -12, y = 1, label = "B1", size = 5, parse = T) +
+     annotate("text", x = 0.16, y = 0.02 , label = "A", size = 5, parse = T) + 
+   annotate("text", x = -8, y = -8 , label = "E", size = 5,parse = T)+ 
+   annotate("text", x = 8, y = -11 , label = "F", size = 5,parse = T)+ 
+  annotate("text", x = -3, y = -13 , label = "D", size = 5,parse = T)+ 
+   annotate("text", x = 10, y = 4 , label = "B2", size = 5,parse = T)
+B
+
 
 # 
 # # Trying to answer these questions:
@@ -67,10 +74,7 @@ B = ggplot(freqs.pca, aes(x = PC2, y = PC3, color = Cluster, shape = Cluster)) +
 # write.table(x = gene_classes, file  = "231019_corrected///gene_classes.csv", sep = ",", col.names = T, row.names = F, quote = F)
 
 gene_classes = read.table("231019_corrected//gene_classes.csv", sep = ",", header = T, stringsAsFactors = F, comment.char = "", quote = "", row.names = 1)
-gene_classes = cbind(gene_classes, total_presence = rowSums(gene_classes))
 total_presence = data.frame(table(gene_classes$total_presence))
-
-
 
 ## examples of genes
 gene_name = "intA_1" ## change here to check the frequency of a gene across the popPUNK clusters
@@ -83,7 +87,7 @@ intA = ggplot(curr, aes(x = name, y = freq)) + geom_bar(stat = "identity") +
   ylab("Frequency") + xlab("PopPUNK cluster") + 
   facet_grid(~phylo, scales = "free",  space = "free",switch = "x")  +
   ggtitle("A - intA")
-
+intA
 
 gene_name = "wzyE" ## change here to check the frequency of a gene across the popPUNK clusters
 curr = data.frame(name = o,
@@ -156,7 +160,7 @@ p2 =  ggplot(df, aes(x = variable, y = value, fill = type)) + geom_bar(stat = "i
   ylab("Fraction of genes")
 p2
 total_presence = cbind(total_presence, lab = paste(total_presence$Var1,"/47",sep=""))
-total_presence = total_presence[-which(total_presence$Var1 == 0),]
+#total_presence = total_presence[-which(total_presence$Var1 == 0),]
 p1 =  ggplot(total_presence, aes(x = total_presence$Var1, y = total_presence$Freq)) + geom_bar(stat = "identity") +
   xlab("Number of clusters in which gene is present") + ylab("Number of genes") +
   theme_bw(base_size = 12)+ theme(axis.text.x = element_text(angle = 90, hjust = 1)) + 
@@ -168,34 +172,33 @@ p1
 
 ### Add information of assignment of truncated genes here so I'm aware
 ## how they distribute
-truncation_assignments = read.table("../4.1_correct_pan_genome/truncated_genes.csv", sep = ",",
-                                    header = T, comment.char = "", stringsAsFactors = F, quote = "")
-truncation_assignments = truncation_assignments$Assignment[match(rownames(gene_classes), truncation_assignments$Gene)]
-truncation_assignments[is.na(truncation_assignments)] = "normal"
-gene_classes = cbind(gene_classes, truncation_assignments)
-gene_classes = gene_classes[-which(is.na(gene_classes$total_presence)),]
-order_truncs = c("normal","common variant (long)", "common variant (short)", "long variant","short variant",
-                 "secondary variant (short)", "secondary variant (long)")
-gene_classes$truncation_assignments = factor(gene_classes$truncation_assignments, order_truncs)
-gene_classes$total_presence = factor(gene_classes$total_presence, 1:47)
-p1 = ggplot(gene_classes, aes(x = total_presence, fill = truncation_assignments)) + geom_bar(color = "black") +
-  xlab("Number of clusters in which gene is present") + ylab("Number of genes") +
-  theme_bw(base_size = 12)+ theme(axis.text.x = element_text(angle = 90, hjust = 1)) + ggtitle("D") +
-  annotate("text", x = 4, y = 28000, label = format(total_presence$Freq[which(total_presence$Var1 == 1)], big.mark = ",", scientific = F)) + 
-  annotate("text", x = 45, y = 3500, label = format(total_presence$Freq[which(total_presence$Var1 == 47)], big.mark = ",", scientific = F)) +
-  scale_fill_manual(values = c(rev(brewer.pal(4, "Greens")[-1]),
-                               rev(brewer.pal(4, "Oranges")[-(1:2)]),
-                               "#FFD92F","#E5C494")) + scale_x_discrete(labels = total_presence$lab)
-legend = as_ggplot(get_legend(p1))
-p1 = p1 + theme(legend.position = "None")
-p1
+# truncation_assignments = read.table("../4.1_correct_pan_genome/truncated_genes.csv", sep = ",",
+#                                     header = T, comment.char = "", stringsAsFactors = F, quote = "")
+# truncation_assignments = truncation_assignments$Assignment[match(rownames(gene_classes), truncation_assignments$Gene)]
+# truncation_assignments[is.na(truncation_assignments)] = "normal"
+# gene_classes = cbind(gene_classes, truncation_assignments)
+# gene_classes = gene_classes[-which(is.na(gene_classes$total_presence)),]
+# order_truncs = c("normal","common variant (long)", "common variant (short)", "long variant","short variant",
+#                  "secondary variant (short)", "secondary variant (long)")
+# #gene_classes$truncation_assignments = factor(gene_classes$truncation_assignments, order_truncs)
+# gene_classes$total_presence = factor(gene_classes$total_presence, 1:47)
+# p1 = ggplot(gene_classes, aes(x = total_presence, fill = truncation_assignments)) + geom_bar(color = "black") +
+#   xlab("Number of clusters in which gene is present") + ylab("Number of genes") +
+#   theme_bw(base_size = 12)+ theme(axis.text.x = element_text(angle = 90, hjust = 1)) + ggtitle("D") +
+#   annotate("text", x = 4, y = 28000, label = format(total_presence$Freq[which(total_presence$Var1 == 1)], big.mark = ",", scientific = F)) + 
+#   annotate("text", x = 45, y = 3500, label = format(total_presence$Freq[which(total_presence$Var1 == 47)], big.mark = ",", scientific = F)) +
+#   scale_fill_manual(values = c(rev(brewer.pal(4, "Greens")[-1]),
+#                                rev(brewer.pal(4, "Oranges")[-(1:2)]),
+#                                "#FFD92F","#E5C494")) + scale_x_discrete(labels = total_presence$lab)
+# legend = as_ggplot(get_legend(p1))
+# p1 = p1 + theme(legend.position = "None")
+# p1
 grid.arrange(intA,wzyE, p1, B, layout_matrix = rbind(c(1,1,1,2,2,2),
                                                     c(1,1,1,2,2,2),
                                                     c(4,4,3,3,3,3),
                                                     c(4,4,3,3,3,3),
                                                     c(4,4,3,3,3,3)))
-legend
-write.table(x = gene_classes, file  = "231019_corrected///gene_classes.csv", sep = ",", col.names = T, row.names = T,quote = F)
+#write.table(x = gene_classes, file  = "231019_corrected///gene_classes.csv", sep = ",", col.names = T, row.names = T,quote = F)
 
 ### ubiquitous genes
 ubiq = gene_classes[which(gene_classes$total_presence == 47),]
@@ -212,135 +215,4 @@ length(which(rare$core == 1 & rare$truncation_assignments == 	"secondary variant
 length(which(rare$core == 1 & rare$truncation_assignments == 	"secondary variant (long)"))
 
 length(which(rare$truncation_assignments != 	"normal"))
-
-
-### OTHER
-plot_for_num <- function(num, p, lay){
-  ubiq = gene_classes[which(gene_classes$total_presence == num),]
-  ubiq = cbind(ubiq, pattern = apply(FUN = paste, X= ubiq[,1:3],1,  collapse = "-"))
-  for_barplot = data.frame(table(ubiq$pattern), stringsAsFactors = F)
-  for_barplot = for_barplot[order(for_barplot$Freq, decreasing = T),]
-  ## first make the heatmap
-  for_hp = ubiq[match(for_barplot$Var1, ubiq$pattern),]
-  for_hp = melt(for_hp[,c(5,1,2,3)], id.vars = "pattern")
-  for_hp$pattern = factor(for_hp$pattern, for_barplot$Var1)
-  for_hp$variable = factor(for_hp$variable, c("rare","inter","core"))
-  hp = ggplot(for_hp, aes(x = pattern, y = variable, fill = value)) + geom_tile(color = "black") +
-    scale_fill_gradient(low = "white",high = "#023858", limits = c(0,num), name = "") + theme_minimal(base_size = 12) + ylab("") + xlab("")+
-    theme(axis.title.x=element_blank(),
-          axis.text.x=element_blank(),
-          axis.ticks.x=element_blank(), panel.grid = element_blank()) + 
-    guides(fill = guide_colourbar(ticks = FALSE,  frame.colour = "black",  nbin = 47)) + theme(legend.position = "bottom")
-  for_barplot$Var1 = factor(for_barplot$Var1, for_barplot$Var1) 
-  legend = as_ggplot(get_legend(hp))
-  hp = hp + theme(legend.position = "None")
-  bp = ggplot(for_barplot, aes(x = Var1, y = Freq)) + geom_bar(stat = "identity", fill = "#023858") +
-    theme_classic(base_size = 12)+
-    xlab("") + ylab("Genes")+
-    theme(axis.title.x=element_blank(),
-          axis.text.x=element_blank(),
-          axis.ticks.x=element_blank(), panel.grid = element_blank())+ 
-    scale_y_continuous(expand = c(0.05,0.05)) + ggtitle("A")
-  ## Analysing entirely rare variants
-  p = p + ggtitle("B")
-  grid.arrange(bp, hp,p, legend, layout_matrix = lay)
-}
-
-
-## genes which are missing only in one cluster
-missing_in_one = gene_classes[which(gene_classes$total_presence == 46 & gene_classes$core == 46),]
-missing_in_one = rownames(missing_in_one)
-## for the ubiq genes, which clusters are they missing from
-missing_in_one = freqs[which(rownames(freqs) %in% missing_in_one),]
-summary_depleted = data.frame(cluster =  colnames(missing_in_one),
-                              num_genes = rep(0, dim(missing_in_one)[2]),
-           missing_genes = rep("", dim(missing_in_one)[2]), stringsAsFactors = F)
-for (i in 1:dim(missing_in_one)[1]){
-  not_core = which(missing_in_one[i,]<0.15) ## which clusters are these genes in very low frequency
-  for (j in not_core){
-    summary_depleted$missing_genes[j] = paste(summary_depleted$missing_genes[j], rownames(missing_in_one)[i], sep = "/")
-    summary_depleted$num_genes[j] = summary_depleted$num_genes[j] + 1
-  }
-}
-
-summary_depleted$cluster =  sapply(summary_depleted$cluster, FUN = gsub, pattern = "X", replacement = "", fixed = T)
-summary_depleted = cbind(summary_depleted, phylogroup = graphics$Phylogroup[match(summary_depleted$cluster, graphics$Cluster)])
-summary_depleted$cluster = factor(summary_depleted$cluster, rev(graphics$Cluster))
-summary_depleted$phylogroup = factor(summary_depleted$phylogroup, c("B2", "F", "D","E","A","C","B1","U"))
-write.table(summary_depleted, file = "../6_missing_specific_genes/missing_genes.csv", sep = ",", col.names = T, row.names = F, quote = F)
-
-p1 = ggplot(summary_depleted, aes(x = cluster, y = num_genes)) + geom_bar(stat = "identity") + theme_classic(base_size = 12)  + 
-  ylab("Genes") + xlab("PopPUNK cluster") + scale_y_continuous(expand = c(0.01,0,0.1,0))+
-  facet_grid(~phylogroup, scales = "free",  space = "free",switch = "x") + theme(axis.text.x = element_text(angle = 90, hjust = 1))
-
-lay = rbind(c(1),
-            c(1),
-            c(1),
-            c(2),
-            3,
-            3,
-            3,
-            3,
-            4)
-plot_for_num(47, p1, lay)
-
-
-
-## this figure explains PC1
-### find genes which are core and specific to a cluster
-## genes which are missing only in one cluster
-specific = gene_classes[which(gene_classes$total_presence == 1 & gene_classes$core == 1),]
-specific = rownames(specific)
-## for the ubiq genes, which clusters are they missing from
-specific = freqs[which(rownames(freqs) %in% specific),]
-summary_specific = data.frame(cluster =  colnames(specific),
-                              num_genes = rep(0, dim(specific)[2]),
-                              specific = rep("", dim(specific)[2]), stringsAsFactors = F)
-for (i in 1:dim(specific)[1]){
-  core = which(specific[i,]>=0.95) ## which clusters are these genes in very low frequency
-  for (j in core){
-    summary_specific$specific[j] = paste(summary_specific$specific[j], rownames(specific)[i], sep = "/")
-    summary_specific$num_genes[j] = summary_specific$num_genes[j] + 1
-  }
-}
-summary_specific$cluster =  sapply(summary_specific$cluster, FUN = gsub, pattern = "X", replacement = "", fixed = T)
-summary_specific = cbind(summary_specific, phylogroup = graphics$Phylogroup[match(summary_specific$cluster, graphics$Cluster)])
-summary_specific$cluster = factor(summary_specific$cluster, rev(graphics$Cluster))
-summary_specific$phylogroup = factor(summary_specific$phylogroup, c("B2", "F", "D","E","A","C","B1","U"))
-write.table(summary_specific, file = "../6_missing_specific_genes//specific_genes.csv", sep = ",", col.names = T, row.names = F, quote = F)
-
-p2 = ggplot(summary_specific, aes(x = cluster, y = num_genes)) + geom_bar(stat = "identity") + theme_classic(base_size = 12)  + 
-  ylab("Genes") + xlab("PopPUNK cluster") + scale_y_continuous(expand = c(0.01,0,0.1,0))+
-  facet_grid(~phylogroup, scales = "free",  space = "free",switch = "x") + theme(axis.text.x = element_text(angle = 90, hjust = 1))
-lay2 = rbind(c(1,3,3,3),
-            c(1,3,3,3),
-            c(1,3,3,3),
-            c(2,3,3,3),
-            c(4,4,4,NA))
-plot_for_num(1, p2, lay2)
-
-
-
-## relationship between number of depleted genes vs number of enriched genes
-
-df = data.frame(cluster = summary_depleted$cluster,
-                missing = summary_depleted$num_genes, specific = summary_specific$num_genes, stringsAsFactors = F)
-lin = ggplot(df, aes(x = missing, y = specific)) + geom_point(alpha = 0.6, size = 1.4) +
-  theme_classic(base_size = 14) +geom_text(aes(label=cluster),hjust=0, vjust=0) +
-  xlab("Missing genes") + ylab("Specific genes")+ 
-  geom_smooth(method='lm', col = 'black') + scale_x_continuous(expand = c(0.01,0,0,4))
-linear_model = lm(formula = specific~missing, data = df)
-summary(linear_model)
-
-max(df$missing)
-max(df$specific)
-median(df$missing)
-median(df$specific)
-min(df$missing)
-min(df$specific)
-
-ubiq = gene_classes[which(gene_classes$total == 47,),]
-specific = gene_classes[which(gene_classes$total == 1,),]
-
-
 

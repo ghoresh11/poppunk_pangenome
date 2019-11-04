@@ -21,7 +21,7 @@ ggplot(diff_in_length, aes(x = diff)) + geom_histogram(binwidth = 10)
 # 3. Can I understand how it's being truncated (N, C, middle, combination)?
 
 relationships = read.table("trunc_relationships.csv", sep = ",", comment.char = "", stringsAsFactors = F, header = T, quote = "")
-ggplot(relationships, aes(x = Location)) + geom_bar()
+
 
 ggplot(relationships, aes(x = Location, y = Ratio)) + geom_violin() + geom_boxplot(width = 0.5)
 
@@ -52,8 +52,7 @@ plot_one_gene<-function(gene){
     ylab("Gene") + xlab("Location (aa)") + ggtitle(gene)
   return(p)
 }
-## change here to look at any gene, can be quite useful
-plot_one_gene("group_324")
+
 
 only_long = unique(relationships$GeneA[which(!relationships$GeneA %in% relationships$GeneB)])
 in_both = intersect(relationships$GeneA, relationships$GeneB) ## for the "in both", I'll consider them truncs as well (just an extra truncation...)
@@ -160,4 +159,30 @@ for (i in 1:dim(gene_assignments)[1]) {
 write.table(gene_assignments, file = "truncated_genes.csv", sep = ",", quote = F, row.names = F, col.names = T)
 
 
+## median number of short genes per longer gene:
+short_per_long = data.frame(table(relationships$GeneA[which(!relationships$GeneA %in% relationships$GeneB)]), stringsAsFactors = F)
 
+## change here to look at any gene, can be quite useful
+A = ggplot(short_per_long, aes(x = Freq)) + geom_histogram(binwidth = 0.5) +
+  theme_bw(base_size = 14) + xlab("Short variants per long variant") + ylab("Long variants") +
+  ggtitle("A") + scale_x_continuous(breaks = 1:15)
+
+B = plot_one_gene("icsA*") + ggtitle("B") + theme(legend.position = "None")
+C = plot_one_gene("group_5407**") + ggtitle("C")+ theme(legend.position = "None")
+C
+
+relationships$Location = factor(relationships$Location, c("N-Terminus","Middle", "C-Terminus"))
+D = ggplot(relationships, aes(x = Location, fill = Location)) + geom_bar() + ylab("Count") + theme_bw(base_size = 14) +
+  scale_fill_manual(values = rev(brewer.pal(8,"Greys")[-8]), guide = F) + ggtitle("D") + xlab("Location (on longer variant)")
+
+table(relationships$Location)
+
+grid.arrange(A,B,C,D, layout_matrix = rbind(c(1,2,3),
+                                          c(4,2,3)) )
+
+
+
+## connect lots of short variants and function
+interpro_res = read.table("../5_classify_genes/interproscan_results.csv", sep = "\t", header = T, 
+                          stringsAsFactors = F, quote = "", comment.char = "")
+short_per_long = cbind(short_per_long, interpro_res[match(short_per_long$Var1, interpro_res$name),])

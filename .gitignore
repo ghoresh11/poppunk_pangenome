@@ -57,6 +57,7 @@ X_eggnog/*.csv
 5_classify_genes/props/*
 5_classify_genes/*csv
 5_classify_genes/prev*
+*/*.gff
 
 *entry.list*
 *.gml

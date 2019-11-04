@@ -6,8 +6,8 @@ library(ggpubr)
 
 setwd("/Users/gh11/poppunk_pangenome/5_classify_genes/")
 
-complete_presence_absence = fread("../4_pairwise_roary/071019_mode_rep/complete_presence_absence.csv", sep = ",", header = T, stringsAsFactors = F)
-classification = read.table("gene_classification.csv", sep = "\t", header = F, stringsAsFactors = F, comment.char = "", quote = "")
+complete_presence_absence = fread("../4_pairwise_roary/231019_corrected//complete_presence_absence.csv", sep = ",", header = T, stringsAsFactors = F)
+classification = read.table("gene_classification.csv", sep = ",", header = F, stringsAsFactors = F, comment.char = "", quote = "")
 
 strains = colnames(complete_presence_absence)[-1]
 genes = complete_presence_absence[,1][-1]
@@ -40,14 +40,41 @@ summarised = aggregate(.~cluster+desc, res, mean)
 ## add the phylogroup information from the graphics file
 graphics = read.table("/Users/gh11/Submissions/my_thesis/Chapter3/figures/cluster_graphics.csv", sep = ",",
                       header = T, comment.char = "")
+
 summarised = cbind(summarised, phylogroup= graphics$Phylogroup[match(summarised$cluster, graphics$Cluster)])
 summarised$cluster = as.character(unique(summarised$cluster))
-summarised$desc = factor(summarised$desc, rev(unique(classification$V2)))
+all_order = c("Real core", "Ubiquitous (soft-core)","Missing in one","40-45 specific",
+              "25-39 specific","10-24 specific","2-9 specific","Core and specific",
+              "Multicluster intermediate", "Intermediate and specific",
+              "Multicluster rare","Rare and specific",
+              "40-45 varied","25-39 varied", "10-24 varied","2-9 varied",
+              "Intermediate and rare","Secondary (specific)","Secondary (intermediate)",
+              "Secondary (rare)","Secondary (varied)")
+
+summarised$desc = factor(summarised$desc, rev(all_order))
+cols = read.table("descs_template.csv", sep = ",", comment.char = "",
+                  stringsAsFactors = F, header = T)
+
+
 B = ggplot(summarised, aes(x = cluster, y = count, fill = desc)) + geom_bar(stat = "identity", color= "black", size = 0.2) +
-  theme_classic(base_size = 12) + scale_fill_manual(values = rev(unique(classification$V3)), guide = F) +
+  theme_classic(base_size = 12) + scale_fill_manual(values = rev(cols$Color), guide = F) + 
   facet_grid(. ~ phylogroup, scales='free',switch = "x", space = "free_x")
 B
 
+summarised$desc = factor(summarised$desc, all_order)
+B = ggplot(summarised, aes(x = desc, y = count, label = cluster, color = phylogroup)) + geom_text(size = 5, hjust = 0, nudge_x = 0.05) + geom_point()+
+  scale_color_brewer(palette = "Dark2") + theme_bw(base_size = 14)+ theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  xlab("Gene class") + ylab("Count")
+B
+
+
+summarised_filtered = summarised[which(summarised$desc %in% c("Real core","Missing in one","25-39 specific","10-24 specific","Core and specific",
+                                                             "Intermediate and specific", "Multicluster rare","Rare and specific","2-9 varied","Intermediate and rare",
+                                                             "Secondary (specific)")),]
+ggplot(summarised_filtered, aes( x = phylogroup, y = count, label = cluster, color = phylogroup)) + geom_text(size = 5, nudge_x = -0.08) +
+  facet_grid(~desc, scales = "free",  space = "free",switch = "x",  labeller = label_wrap_gen(width=5)) + scale_color_brewer(palette = "Dark2", guide = F) + 
+  theme_minimal(base_size = 14)+ 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
 summarised_all = aggregate(by = list(summarised$desc), x = summarised$count, mean)
 summarised_all = cbind(summarised_all, col = classification$V3[match(summarised_all$Group.1, classification$V2)])

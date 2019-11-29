@@ -27,7 +27,8 @@ ggplot(relationships, aes(x = Location, y = Ratio)) + geom_violin() + geom_boxpl
 
 ## to plot against a particular long gene (doesn't plot ALL the genes in a connected component, only all the genes
 ## which are connected to a particular other gene)
-plot_one_gene<-function(gene){
+plot_one_gene<-function(gene, domain_df){
+  domain_df = read.csv(domain_df, sep = ",", header = T, stringsAsFactors = F,quote = "", comment.char = "")
   check_one = relationships[relationships$GeneA == gene,]
   the_seq = check_one[1,]
   the_seq$Start = 0
@@ -37,18 +38,33 @@ plot_one_gene<-function(gene){
   the_seq$StdB = the_seq$StdA
   check_one = rbind(the_seq, check_one)
   
-  check_one$Location = factor(check_one$Location, c("Ref", "N-Terminus","Middle", "C-Terminus"))
+  name_order =  c("Ref", "N-Terminus","Middle", "C-Terminus")
+  for (i in 1:dim(domain_df)[1]){
+    the_seq$Start = domain_df$Start[i]
+    the_seq$Stop = domain_df$Stop[i]
+    the_seq$Location = domain_df$Name[i]
+    check_one = rbind(the_seq, check_one)
+    if (!domain_df$Name[i] %in% name_order){
+      name_order = c(name_order, domain_df$Name[i])
+    }
+  }
+  
+  ## to do: add here to the factors, so it needs to be loaded as a dataframe
+  check_one$Location = factor(check_one$Location, name_order)
+  
+  
   check_one = check_one[
     order( check_one$Location, -check_one$LengthB ),
     ]
-  check_one$GeneB = factor(check_one$GeneB, rev(check_one$GeneB))
+  check_one$GeneB = factor(check_one$GeneB, rev(unique(check_one$GeneB)))
   check_one$STD_high = check_one$Stop + check_one$StdB
   check_one$STD_low = check_one$Start - check_one$StdB
   check_one$STD_low[check_one$STD_low < 0] = 0
-  p = ggplot() +
+  cols = c(rev(brewer.pal(8,"Greys"))[1:4], brewer.pal(8, "Set2"))
+  p =  ggplot() +
     #geom_segment(data = check_one, aes(x = STD_low, y = GeneB, xend = STD_high, yend = GeneB),color = "blue", size = 0.5) +
     geom_segment(data = check_one, aes(x = Start, y = GeneB, xend = Stop, yend = GeneB, col= Location), size = 10) +
-    scale_colour_manual(values = rev(brewer.pal(8,"Greys"))) + theme_bw(base_size = 14) +
+    scale_colour_manual(values = cols) + theme_bw(base_size = 14) +
     ylab("Gene") + xlab("Location (aa)") + ggtitle(gene)
   return(p)
 }
@@ -137,9 +153,9 @@ for (i in 1:dim(gene_assignments)[1]) {
     next
   } 
   partner_shorter_genes = data.frame(Gene = relationships$GeneB[which(relationships$GeneA == curr_gene)], 
-                                    Length = relationships$LengthB[which(relationships$GeneA == curr_gene)],
-                                    Std = relationships$StdB[which(relationships$GeneA == curr_gene)],
-                                    stringsAsFactors = F)
+                                     Length = relationships$LengthB[which(relationships$GeneA == curr_gene)],
+                                     Std = relationships$StdB[which(relationships$GeneA == curr_gene)],
+                                     stringsAsFactors = F)
   partner_shorter_genes$Num_cluster = components$Num_clusters[match(partner_shorter_genes$Gene, components$Gene)]
   partner_shorter_genes = partner_shorter_genes[which(partner_shorter_genes$Num_cluster == max(partner_shorter_genes$Num_cluster)),]
   partner = partner_shorter_genes[which(partner_shorter_genes$Length == max(partner_shorter_genes$Length)),]
@@ -167,18 +183,22 @@ A = ggplot(short_per_long, aes(x = Freq)) + geom_histogram(binwidth = 0.5) +
   theme_bw(base_size = 14) + xlab("Short variants per long variant") + ylab("Long variants") +
   ggtitle("A") + scale_x_continuous(breaks = 1:15)
 
-B = plot_one_gene("icsA*") + ggtitle("B") + theme(legend.position = "None")
-C = plot_one_gene("group_5407**") + ggtitle("C")+ theme(legend.position = "None")
-C
+interpro_scan_results = read.csv("/Users/gh11/poppunk_pangenome/5_classify_genes/interproscan_results.gff", sep = "\t", 
+                                   stringsAsFactors = F, quote = "", header = F, comment.char = "#")
+interpro_scan_results = interpro_scan_results[which(interpro_scan_results$V2 == "Pfam"),]
+colnames(interpro_scan_results) = c("Gene","V2","V3","Start", "Stop","V6","V7","V8","Name")
+
+B = plot_one_gene("icsA*","icsA.csv") + ggtitle("B") + theme(legend.position = "None")
+C = plot_one_gene("group_1985*","group_1985*.csv")+ theme(legend.position = "None")
 
 relationships$Location = factor(relationships$Location, c("N-Terminus","Middle", "C-Terminus"))
 D = ggplot(relationships, aes(x = Location, fill = Location)) + geom_bar() + ylab("Count") + theme_bw(base_size = 14) +
   scale_fill_manual(values = rev(brewer.pal(8,"Greys")[-8]), guide = F) + ggtitle("D") + xlab("Location (on longer variant)")
-
+D
 table(relationships$Location)
 
-grid.arrange(A,B,C,D, layout_matrix = rbind(c(1,2,3),
-                                          c(4,2,3)) )
+grid.arrange(A,B,C,D, layout_matrix = rbind(c(1,2,2,3,3),
+                                            c(4,2,2,3,3)) )
 
 
 
@@ -186,3 +206,7 @@ grid.arrange(A,B,C,D, layout_matrix = rbind(c(1,2,3),
 interpro_res = read.table("../5_classify_genes/interproscan_results.csv", sep = "\t", header = T, 
                           stringsAsFactors = F, quote = "", comment.char = "")
 short_per_long = cbind(short_per_long, interpro_res[match(short_per_long$Var1, interpro_res$name),])
+ecoli_variants = short_per_long[which(short_per_long$Freq > 5),]
+ecoli_variants = ecoli_variants[order(ecoli_variants$Freq, decreasing = T),]
+write.table(ecoli_variants, file = "/Users/gh11/Submissions/my_thesis/Chapter4/prep/genes_truncated/ecoli_variants.csv",
+            sep = ",", row.names = F, col.names = T, quote = T)

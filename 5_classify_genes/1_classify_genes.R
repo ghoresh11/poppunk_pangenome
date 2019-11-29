@@ -52,12 +52,13 @@ gene_classes = update_gene_classes(inter_and_rare, "Intermediate and rare")
 
 ### Other
 get_values_in_range <- function(minimum, maximum) {
-  range = other[which(other$core >= minimum & other$core<= maximum),]
+  range = other[which(other$total_presence >= minimum & other$total_presence<= maximum),]
   specific = row.names(range)[which(range$core == range$total_presence)]
   varied = row.names(range)[which(range$core != range$total_presence)]
   return(list(specific, varied))
 }
 
+other = gene_classes[which(gene_classes$gene_class == ""),]
 rarely = get_values_in_range(1,9)
 rarely_specific = rarely[[1]]
 gene_classes = update_gene_classes(rarely_specific, "2-9 specific")
@@ -76,11 +77,11 @@ gene_classes = update_gene_classes(sometimes_specific, "25-39 specific")
 sometimes_varied = sometimes[[2]]
 gene_classes = update_gene_classes(sometimes_varied, "25-39 varied")
 
-mostly = get_values_in_range(40,45)
+mostly = get_values_in_range(40,46)
 mostly_specific = mostly[[1]]
 gene_classes = update_gene_classes(mostly_specific, "40-45 specific")
 mostly_varied = mostly[[2]]
-gene_classes = update_gene_classes(mostly_varied, "40-45 varied")
+gene_classes = update_gene_classes(mostly_varied, "40-46 varied")
 
 
 missing_in_one = rownames(other)[which(other$core == 46)]
@@ -103,23 +104,20 @@ all$Cat =  c(rep(c("Specific Core", "Varied"),5),"Intermediate","Core","Intermed
 all = all[order(all$Cat),]
 all_order = c("Real core", "Ubiquitous (soft-core)","Missing in one","40-45 specific",
               "25-39 specific","10-24 specific","2-9 specific","Core and specific",
+              "40-46 varied","25-39 varied", "10-24 varied","2-9 varied",  "Intermediate and rare",
               "Multicluster intermediate", "Intermediate and specific",
               "Multicluster rare","Rare and specific",
-              "40-45 varied","25-39 varied", "10-24 varied","2-9 varied",
-              "Intermediate and rare","Secondary (specific)","Secondary (intermediate)",
-              "Secondary (rare)","Secondary (varied)")
+            "Secondary (specific)","Secondary (varied)","Secondary (intermediate)",
+              "Secondary (rare)")
 all = all[match(all_order, all$Var1),]
 
 all$Color = c(rev(brewer.pal(n=4, "Blues")[-1]), ## core
               rev(brewer.pal(n = 6, "Purples")[-1]), ## specific core
+              rev(brewer.pal(n = 5, "Greens")), ## varied
               rev(brewer.pal(n = 3, "Reds")[-1]), ## intermediate
               rev(brewer.pal(n = 3, "Oranges")[-1]), ## rare
-              rev(brewer.pal(n = 5, "Greens")), ## varied
-              c("#DECBE4", "#FBB4AE", "#FED9A6" ,"#B3E2CD")) ## secondary
+              c("#DECBE4", "#B3E2CD","#FBB4AE", "#FED9A6")) ## secondary
 
-#all$Color[which(!all$Cat %in% c("Core","Specific Core"))] = "#d3d3d3"
-#all$Color[which(!all$Cat %in% c("Rare"))] = "#d3d3d3"
-all$Color[which(!all$Cat %in% c("Intermediate","Varied"))] = "#d3d3d3"
 
 #write.table(all, file = "descs_template.csv", sep = ",", quote = F, row.names = F, col.names = T)
 
@@ -132,20 +130,18 @@ sum(all$Freq[all$Cat == "Varied"]) / sum(all$Freq)
 sum(all$Freq[all$Cat == "Secondary variant"]) / sum(all$Freq)
 
 
-all$Cat = factor(all$Cat, rev(c("Core","Specific Core","Intermediate","Rare","Varied","Secondary variant")))
-all$Var1 = factor(all$Var1, all$Var1 ) ## TODO change the order
+all$Cat = factor(all$Cat, rev(c("Core","Specific Core","Varied","Intermediate","Rare","Secondary variant")))
+all$Var1 = factor(all$Var1, all$Var1 ) 
 # df$Count = as.numeric(df$Count)
 # df$Color = as.character(df$Color)
-A = ggplot(all, aes(x = Cat, fill = Var1, y= Freq)) + geom_bar(stat = "identity", color = "black") +
+B= ggplot(all, aes(x = Cat, fill = Var1, y= Freq, color = Cat)) + geom_bar(stat = "identity") +
   scale_fill_manual(values = all$Color, name = "") +
-  theme_classic(base_size = 12) + ylab("Genes") + coord_flip() + scale_y_continuous(expand = c(0.01,0.01))+
-  theme(legend.position = "None") + xlab("")+guides(fill=guide_legend(ncol=3,byrow=F))
+  theme_classic(base_size = 14) + ylab("Genes") + coord_flip() + scale_y_continuous(expand = c(0.01,0.01))+
+  theme(legend.position = "None") + xlab("")+guides(fill=guide_legend(ncol=3,byrow=F)) +
+  scale_color_manual(values = rev(c(rep("black",5),"#d3d3d3"))) + ggtitle("B")  +
+   scale_x_discrete(labels = rev(c("Core","Specific","Varied","Intermediate","Rare","Secondary")))
 
-A
-legend = as_ggplot(get_legend(A))
-legend
-A = A + theme(legend.position = "None")
-A
+B
 
 write.table(x = data.frame(row.names(gene_classes), gene_classes$gene_class, all$Color[match(gene_classes$gene_class, all$Var1)]),file = "gene_classification.csv",
             col.names = F, row.names = F, sep = ",", quote = F)

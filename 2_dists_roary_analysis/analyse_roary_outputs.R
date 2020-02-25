@@ -21,7 +21,7 @@ filtered_md = read.table("/Users/gh11/e_colis/FILTERED_MD_FINAL_ALL.tab", sep = 
 ## genome size
 filtered_md$Poppunk_cluster = factor(filtered_md$Poppunk_cluster, cluster_sizes$Cluster)
 
-graphics = read.table("/Users/gh11/Submissions/my_thesis/Chapter3/figures/cluster_graphics.csv", sep = ",",
+graphics = read.table("/Users/gh11/Submissions/my_thesis/Chapter4//figures/cluster_graphics.csv", sep = ",",
                       comment.char = "", stringsAsFactors = F, header = T)
 graphics = graphics[match(cluster_sizes$Cluster,graphics$Cluster),]
 

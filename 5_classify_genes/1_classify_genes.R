@@ -144,5 +144,5 @@ B= ggplot(all, aes(x = Cat, fill = Var1, y= Freq, color = Cat)) + geom_bar(stat 
 B
 
 write.table(x = data.frame(row.names(gene_classes), gene_classes$gene_class, all$Color[match(gene_classes$gene_class, all$Var1)]),file = "gene_classification.csv",
-            col.names = F, row.names = F, sep = ",", quote = F)
+            col.names = F, row.names = F, sep = "\t", quote = F)
 

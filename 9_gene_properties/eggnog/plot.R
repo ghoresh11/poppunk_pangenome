@@ -9,46 +9,53 @@ cogs = read.csv("eggnog_results.emapper.annotations", sep = "\t",stringsAsFactor
 cogs_desc = read.csv("cog_descs.csv", sep = ",", comment.char = "", stringsAsFactors = F, quote = "", header = T)
 cogs_desc$Title = str_wrap(cogs_desc$Title, width = 10)
 
-class_desc = read.csv(file = "../../5_classify_genes/descs_template.csv", sep = ",", comment.char = "",
+class_desc = read.csv(file = "../../5_classify_genes/colours_v2.csv", sep = ",", comment.char = "",
                       stringsAsFactors = F, header = T)
-class_desc$Main.Label[which(class_desc$Main.Label == "Intermediate")] = "Inter."
 
-classification = read.table("../../5_classify_genes/gene_classification.csv", sep = ",", comment.char = "",
-                            stringsAsFactors = F, header = F, quote = "")
+classification = read.table("../../5_classify_genes/classification_v2.csv", sep = "\t", comment.char = "",
+                            stringsAsFactors = F, header = T, quote = "")
 
-classification$COG = cogs$V12[match(classification$V1, cogs$V1)]
+classification$COG = cogs$V12[match(classification$gene, cogs$V1)]
 classification$COG[is.na(classification$COG) | classification$COG == ""] = "?"
-classification = cbind(classification, cogs_desc[match(classification$COG, cogs_desc$COG),])
-classification = classification[,-4]
+classification$Title = cogs_desc$Title[match(classification$COG, cogs_desc$COG)]
 
+classification = classification[-which(!classification$COG %in% cogs_desc$COG),]
 
 ## by fraction of genes from each class rather than pure counts
-counts  = table(classification$V2, classification$COG)
+counts  = table(classification$fill, classification$COG)
 counts = counts/ rowSums(counts)
 counts = data.frame(counts, stringsAsFactors = F)
 counts$Title = cogs_desc$Title[match(counts$Var2, cogs_desc$COG)]
-counts = cbind(counts, class_desc[match(counts$Var1, class_desc$Var1),])
-counts = counts[,-(5:7)]
+counts = cbind(counts, class_desc[match(counts$Var1, class_desc$Class),])
 
-counts$Var1 = factor(counts$Var1, class_desc$Var1)
-counts$Main.Label = factor(counts$Main.Label, unique(class_desc$Main.Label))
+counts$Var1 = factor(counts$Var1, class_desc$Class)
+counts$Main.Class = factor(counts$Main.Class, unique(class_desc$Main.Class))
 counts$Var2 = factor(counts$Var2, cogs_desc$COG)
 counts$Title = factor(counts$Title, unique(cogs_desc$Title))
 
 ggplot(counts, aes(x = Var1, y = Freq, fill = Var2)) + geom_bar(stat = "identity", color = "black", lwd = 0.2) + 
-  facet_grid(Title~Main.Label, scales = "free_x",  space = "free_x",switch = "both") +
+  facet_grid(Title~Main.Class, scales = "free",  space = "free_x",switch = "both") +
   scale_fill_manual(values = cogs_desc$Col, name = "") + theme_bw(base_size = 14) + 
-  theme(axis.text.x = element_text(angle = 90, hjust = 1)) + xlab("") + ylab("Fraction of genes")
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) + xlab("Occurrence class") + ylab("Fraction of genes")
 
-
+## for a fishers test
+gene_type1 = "Population core"
+gene_type2 = "Multi-cluster intermediate"
+df_test = dcast(data = counts[counts$Var1 %in% c(gene_type1, gene_type2),],
+                formula = Title ~ Var1, value.var = "Freq", fun.aggregate = sum)
+colnames(df_test) = c("Title","Gene_type1","Gene_type2")
+df_test$Gene_type1= df_test$Gene_type1 * length(which(classification$fill == gene_type1))
+df_test$Gene_type2= df_test$Gene_type2 * length(which(classification$fill == gene_type2))
+df_test = as.matrix(df_test[,-1])
+t = chisq.test(t(df_test))
 
 ### to plot the words in particular gene glasses for some COG cats
 
 word_files = dir("words/", full.names = T) #where you have your files
-words = do.call(rbind,lapply(word_files,read.csv, sep = ",", comment.char = "", quote = "", stringsAsFactors = F, header = T))
+words = do.call(rbind,lapply(word_files,read.csv, sep = "\t", comment.char = "", quote = "", stringsAsFactors = F, header = T))
 words$Title =  cogs_desc$Title[match(words$COG, cogs_desc$COG)]
-words$Class_cat = class_desc$Main.Label[match(words$Class, class_desc$Var1)]
-
+words$Class_cat = class_desc$Main.Class[match(words$Class, class_desc$Class)]
+words = words[-which(words$Word == "major facilitator"),]
 
 ## counts per class
 
@@ -97,27 +104,30 @@ make_one_cog <- function(cog){
     theme(axis.text.x = element_text(angle = 90, hjust = 1)) + scale_fill_manual(values = class_desc$Color, guide = F) +
     scale_color_manual(values = class_desc$Border, guide = F) +
     facet_grid(Class_cat~., scales = "free_x",  space = "free",switch = "both") 
- ggsave(plot = p, filename = paste("plots/", cog, ".pdf", sep = ""), height = 10, width = 15)
+  ggsave(plot = p, filename = paste("plots/", cog, ".pdf", sep = ""), height = 10, width = 15)
   means = aggregate(test$fraction, by = list(test$Class_cat, test$Label), FUN = mean)
+  means = means[order(means$Group.1, means$x, decreasing = T),]
   return(means)
 }
 
 ###
-gene_types = class_desc$Var1
-for (curr_gene_type in gene_types){
-  word_counts = read.table(paste("words/", gsub(x = curr_gene_type, pattern = " ", replacement = "_"), "_words.csv", sep = ""),
-                           sep = ",", comment.char = "", quote = "", stringsAsFactors = F, header = T)
-  word_counts$Title =  cogs_desc$Title[match(word_counts$COG_Cat, cogs_desc$COG)]
-  word_counts$Color = cogs_desc$Col[match(word_counts$COG_Cat, cogs_desc$COG)]
-  word_counts = word_counts[-which(word_counts$Count < 4), ]
-  p = ggplot(word_counts, aes(x = Word, y = Count, fill = COG_Cat))+ geom_bar(stat = "identity", color = "black", lwd = 0.2) + 
-    facet_grid(.~Title, scales = "free_x",  space = "free_x",switch = "both") +
-    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-    scale_x_discrete(labels = word_counts$Label) + ggtitle(curr_gene_type)
-  print(p)
-}
+
+curr_gene_types = c("Multi-cluster rare","Intermediate and rare","Core, intermediate and rare")
+#curr_gene_types = c("Multi-cluster rare")
+#curr_gene_types = "Cluster specific rare"
+word_counts = words[words$Class %in% curr_gene_types,]
+word_counts = word_counts[-which(word_counts$Count < quantile(x = word_counts$Count,probs = 0.97)), ]
+word_counts = word_counts[order(word_counts$Count, decreasing = T),]
+word_counts$COG = factor(word_counts$COG, cogs_desc$COG)
+word_counts$Label = factor(word_counts$Label, unique(word_counts$Label))
+H = ggplot(word_counts, aes(x = Label, y = Count, fill = Title))+ geom_bar(stat = "identity", color = NA) + 
+  facet_grid(.~Title, scales = "free_x",  space = "free_x",switch = "both") + theme_classic(base_size = 14) +
+  scale_y_continuous(expand = c(0,0,0.1,0)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_fill_manual(values = c("#377eb8","#4daf4a","#ff7f00","#d3d3d3"), guide = F)
 
 
+S = make_one_cog("S")
 K = make_one_cog("K")
 L = make_one_cog("L")
 M = make_one_cog("M")
@@ -126,9 +136,9 @@ T_cog = make_one_cog("T")
 ## for text
 summary =  aggregate(counts$Freq, by = list(counts$Var1, counts$Title), FUN = sum)
 summary_2 = aggregate(counts$Freq, by = list(counts$Var1, counts$Var2), FUN = sum)
-summary_2$Group.1 = factor(summary_2$Group.1, class_desc$Var1)
-summary_2$title = class_desc$Main.Label[match(summary_2$Group.1, class_desc$Var1)]
-summary_2$title = factor(summary_2$title, unique(class_desc$Main.Label))
+summary_2$Group.1 = factor(summary_2$Group.1, class_desc$Class)
+summary_2$title = class_desc$Main.Class[match(summary_2$Group.1, class_desc$Class)]
+summary_2$title = factor(summary_2$title, unique(class_desc$Main.Class))
 summary_2$Group.2 = factor(summary_2$Group.2 , unique(cogs_desc$COG))
 
 chosen = c("J","K","L","N","M","V","U","O","T")
@@ -142,4 +152,6 @@ ggplot(summary_2, aes(x = Group.1, y = x,fill = Group.2, group = Group.2))  +
   xlab("") + ylab("Fraction of genes")
 
 
-
+## more summaries
+more = aggregate(x = counts$Freq, list(counts$Class, counts$Title), FUN = sum)
+more = cbind(more, more2$x)

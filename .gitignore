@@ -78,6 +78,9 @@ X_eggnog/*.csv
 7_AMR_vir_plasmid/results/
 7_AMR_vir_plasmid/smaller_tree/*.gff
 
+9_gene_properties/eggnog/*.txt
+9_gene_properties/treeseg/examples
+
 10_gene_sharing/plots*
 10_gene_sharing/*/*.txt
 10_gene_sharing/graphs*

@@ -15,8 +15,10 @@ def read_classification_file(infile):
     gene_to_genetype = {}
     with open(infile) as f:
         for line in f:
-            toks = line.strip().split(",")
-            gene_to_genetype[toks[0]] = toks[1]
+            if line.startswith("gene"):
+                continue
+            toks = line.strip().split("\t")
+            gene_to_genetype[toks[0]] = toks[8]
     return gene_to_genetype
 
 def read_eggnog_annotation(eggnog_file, ignore, gene_to_genetype):
@@ -42,8 +44,10 @@ def read_eggnog_annotation(eggnog_file, ignore, gene_to_genetype):
             
            
             cogs_cat = toks[-2].split(",")
+
             words_temp = toks[-1].lower()
             words_temp = re.sub('[^a-zA-Z0-9\- \n\.]', '', words_temp)
+            print(words_temp)
             words_temp = words_temp.split()
             words = []
             for w in words_temp: ## remove common words
@@ -54,6 +58,7 @@ def read_eggnog_annotation(eggnog_file, ignore, gene_to_genetype):
                 c = c.replace(" ","")
                 if c not in curr_word_counts:
                     curr_word_counts[c] = {}
+
 
                 ## take all word combinations
                 for start, end in combinations(range(len(words)), 2):
@@ -109,19 +114,19 @@ def generate_outputs(word_counts):
     for gene_type in word_counts:
         curr_word_counts = word_counts[gene_type]
         out = open("words/" + gene_type.replace(" ","_") + "_words.csv", "w")
-        out.write("Class,COG,Word,Label,Count\n")
+        out.write("Class\tCOG\tWord\tLabel\tCount\n")
         for c in curr_word_counts:
             for w in curr_word_counts[c]:
                 label = w
                 if len(w) > 30:
                     label = w[:30]
-                out.write(",".join(map(str,[gene_type.replace("_"," "), c, w, label, curr_word_counts[c][w]])) + "\n")
+                out.write("\t".join(map(str,[gene_type.replace("_"," "), c, w, label, curr_word_counts[c][w]])) + "\n")
         out.close()
     return
 
 def run():
     ignore = read_words_to_ignore()
-    gene_to_genetype = read_classification_file("/Users/gh11/poppunk_pangenome/5_classify_genes/gene_classification.csv")
+    gene_to_genetype = read_classification_file("/Users/gh11/poppunk_pangenome/5_classify_genes/classification_v2.csv")
     word_counts = read_eggnog_annotation("eggnog_results.emapper.annotations", ignore, gene_to_genetype)
     generate_outputs(word_counts)
     return

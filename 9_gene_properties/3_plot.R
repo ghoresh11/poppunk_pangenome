@@ -109,12 +109,12 @@ props$New_class = new_class
 
 
 A = plot_one_property("length", "Length (aa)", "A", log = T) 
-B = plot_one_property("contig_length", "Contig length (bp)","C", log = T)
-C = plot_one_property("distance", "Distance from edge (bp)", "E",log = T)
-D = plot_one_property("GC", "%GC", "G", log = F, hline = F)
-E = plot_one_property("gravy", "GRAVY score", "I", log = F) 
-F_plt = plot_one_property("aromaticity", "fraction aromatic aa", "K", log = F, blank = T) 
-G = plot_one_property("start_codon", "%ATG", "M", log = F, hline = F) 
+B = plot_one_property("contig_length", "Contig length (bp)","B", log = T)
+C = plot_one_property("distance", "Distance from edge (bp)", "C",log = T)
+D = plot_one_property("GC", "%GC", "D", log = F, hline = F)
+E = plot_one_property("gravy", "GRAVY score", "E", log = F) 
+F_plt = plot_one_property("aromaticity", "fraction aromatic aa", "F", log = F, blank = T) 
+G = plot_one_property("start_codon", "%ATG", "G", log = F, hline = F) 
 
 ## to run a test:
 ## pairwise.wilcox.test(g = curr_df$class, x = curr_df$Mean, p.adjust.method = "fdr")
@@ -136,13 +136,17 @@ layout_matrix = rbind(c(1,1,1,2),
                       c(13,13,13,14)
 )
 
-grid.arrange(A,Ax,B,Bx,C,Cx,D,Dx,E,Ex,F_plt,Fx,G,Gx, layout_matrix = layout_matrix)
+#grid.arrange(A,Ax,B,Bx,C,Cx,D,Dx,E,Ex,F_plt,Fx,G,Gx, layout_matrix = layout_matrix)
 
 
+
+grid.arrange(A,B,C,D,E,F_plt,G, ncol = 1)
 
 
 ## For the text
-mean(props$Mean[which(props$New_class == "=>10" & props$Property == "aromaticity")])
+median(props$Mean[props$Property == "length"])
+mean(props$Mean[which(props$New_class == "<10" & props$Property == "length")])
+
 mean(props$Mean[which(props$New_class == "<10" & props$Property == "aromaticity")], na.rm = T)
 
 

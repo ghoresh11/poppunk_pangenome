@@ -1,5 +1,7 @@
 library(ape)
 library(treeSeg)
+library(ggplot2)
+library(gridExtra)
 
 setwd("/Users/gh11/poppunk_pangenome/9_gene_properties/treeseg/")
 
@@ -34,40 +36,61 @@ class_desc = read.table("../../5_classify_genes/descs_template.csv", sep = ",", 
 ### FUNCTIONS ####
 
 ## Run a single treeSeg test and plot it ##
-run_one_test <- function(gene_name){
+run_one_test <- function(gene_name, plot = T){
   test = freqs[row.names(freqs) == gene_name,]
   test = t(test)[,1][match(tree$tip.label, colnames(test))]
   names(test) = tree$tip.label
   test[which(test>0)] = 1
   test = as.numeric(test)
   seg = treeSeg(as.numeric(unlist(test)), tree, alpha = 0.05)
-  plot_seg_result(seg, test)
-  return(seg$mlAN)
+  if (plot) { plot_seg_result(seg, list(test)) }
+  return(list(seg, test))
 }
 
+run_multiple_tests <- function(genes) {
+  tests = list()
+  segs = list()
+  for (g in genes) {
+    res = run_one_test(g, plot = F)
+    segs[[g]] = res[[1]]
+    tests[[g]] = res[[2]]
+  }
+  plot_seg_result(segs, tests)
+  
+}
 
 ## Plot results of treeSeg ##
-plot_seg_result <- function(seg, test){
+plot_seg_result <- function(seg, tests){
   ### plot
   n = length(tree$tip.label)
   lwdEdge <- rep(1.5, dim(tree$edge)[1])
-  layout(mat=matrix(1:3,ncol = 1),heights = rep(c(2,0.1, 1),6))
-  par(mar = c(0.1,3,0.1,0.1))
+  if (length(tests) == 1) {
+    layout(mat=matrix(1:3,ncol = 1),heights = rep(c(2,0.1, 1),6))
+    test = tests[[1]]
+  } else {
+    layout(mat=matrix(1:(2+length(tests)),ncol = 1),heights = c(2,rep(0.1,length(tests))))
+    seg = seg[[1]]
+  }
+  par(mar = c(0.1,1,0.1,0.1))
   
   plot(tree, type = "phylogram", show.tip.label = T , use.edge.length = F, cex = 1.5,
        node.pos = 1, direction = "downwards", show.node.label = F, edge.width = lwdEdge) 
   
   # plot maximum likelihood estimate for the nodes where the distribution of phenotype changes.
-  if (length(seg$mlAN) > 0) {
+  ## to add the red dot on the clade...
+  if (length(tests) == 1 && length(seg$mlAN) > 0 ) {
     for(i in 1:length(seg$mlAN)){
       nodelabels("", seg$mlAN[i], pch = 18, col = "red", frame = "none",cex = 2)
     }
   }
   # plot tip phenos
-  plot(1:n, rep(0,n), axes = F, col = c("lightgray", "black")[test+1], pch = "|", cex = 2,xlab = '',ylab = '') 
-  
+  for (test in tests) {
+    plot(1:n, rep(0,n), axes = F, bg = c("white", "black")[test+1],
+         col = c("black", "black")[test+1], pch = 22, cex = 4,xlab = '',ylab = '') 
+  }
+  if (length(tests) > 1 ) { return() }
   # plot the maximum likelihood estimates for the phenotype distributions for each segment.
-  par(mar = c(2,4,0.1,0.1))
+  par(mar = c(1,2,0.1,0.1))
   plot(1:n, seg$mlP,type = "l", lwd = 1, axes = F,ylim = c(-0.1,1.1),col='red',xlab = '',ylab = '')
   
   # plot the confidence interval for the phenotype distributions.
@@ -257,7 +280,7 @@ if (CALCULATE) {
   min_subtrees_genes = rbind.fill(lapply(X = classification$V1, FUN = count_minimal_subtrees))
 } else {
   smallest_subtree_genes = read.table("smallest_subtree.csv", sep = ",", comment.char = "", stringsAsFactors = F, header = T)
-  min_subtrees_genes = read.table("min_subtrees_genes", sep = ",", comment.char = "", stringsAsFactors = F, header = T)
+  min_subtrees_genes = read.table("all_minimal_subtrees.csv", sep = ",", comment.char = "", stringsAsFactors = F, header = T)
 }
 
 ## Step 3: Modify dataframes
@@ -322,13 +345,94 @@ all_genes_summary = all_genes_summary[-which(all_genes_summary$Cat == "Core"),]
 all_genes_summary$Var2 = factor(all_genes_summary$Var2, c("treeseg", "min_subtrees", "smallest_subtree",
                                                           "treeseg+min_subtrees","min_subtrees+smallest_subtree","treeseg+smallest_subtree",
                                                           "All"))
+## remove trivials
+trivials = c("Rare and specific","Intermediate and specific","Core and specific")
+all_genes_summary = all_genes_summary[-which(all_genes_summary$Var1 %in% trivials),]
+
 ## counts of genes associated with a lineage (there's no correction for multiple testing, so can assume that about 5% is wrong...)
 ggplot(all_genes_summary, aes(x = Var1, y = Freq, fill = Var2)) + geom_bar(stat = "identity", color = "black") +
   facet_grid(.~Cat, scales = "free_x",  space = "free",switch = "x") + 
-scale_fill_brewer(palette = "YlGnBu") +
+  scale_fill_brewer(palette = "YlGnBu", name = "", labels = 
+                      c("TreeSeg", "minimum trees","smallest subtree", "TreeSeg + minimum trees", "minimum trees + smallest subtree",
+                        "TreeSeg + smallest subtree", "All")) +
   theme_classic(base_size = 14) + xlab("") + ylab("Fraction of genes")+ theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-  scale_y_continuous(expand = c(0,0), limits = c(0,1))
+  scale_y_continuous(expand = c(0,0), limits = c(0,1)) + 
+  theme(legend.position = "bottom")
+
+
+## for the text
+sum(all_genes_summary$Freq[which(all_genes_summary$Var1  == "25-39 specific")])
 
 
 
-test = all_results[all_results$combined == "treeseg",]
+## plot a tree with the genes that have different associations
+all = "dctB"
+only_treeseg = "higA_3*"
+only_min_tree = "bhsA_4"
+only_smallest_tree = "pikAV_3"
+smallest_min_subtrees = "group_3567"
+smallest_treeseg = "group_4943"
+treeseg_min_subtrees = "tsaR_2"
+none = "soj"
+run_multiple_tests(c(all, smallest_treeseg, smallest_min_subtrees, treeseg_min_subtrees,
+                     only_smallest_tree, only_treeseg, only_min_tree, none))
+
+
+
+
+## the associations mean different things (i don't trust only treeSeg or only min_trees)
+tree_seg_min_subtree = all_results[all_results$combined %in% c("treeseg+min_subtrees"),] ## indicates more lineages/deletion in a lineage
+all = all_results[all_results$combined %in% c("All"),] ## strong association
+smallest_subtree = all_results[all_results$combined %in% c("smallest_subtree"),]  ## confinement to a clade
+
+plot_one_group <- function(df, column) {
+  colnames(df)[which(colnames(df) == column)] = "lineage"
+  curr_class_desc = class_desc[which(class_desc$Var1 %in% df$class),]
+  df$class = factor(df$class, curr_class_desc$Var1)
+  df$lineage = factor(df$lineage, names(sort(table(df$lineage), decreasing = F)))
+  p = ggplot(df, aes(x = lineage,fill = class, color = class)) + geom_bar(lwd = 0.3)+  
+    theme_classic(base_size = 14)+
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    scale_fill_manual(values = curr_class_desc$Color) +
+    scale_color_manual(values = curr_class_desc$Border) +
+    xlab("Clade") + ylab("Genes") + theme(legend.position = "None") + coord_flip()
+  return (p)
+}
+
+signif = all_results[all_results$combined != "No",]
+signif = signif[signif$combined != "min_subtrees",]
+signif$lineage = signif$subtree_lineage 
+signif$lineage[which(!is.na(signif$treeseg_lineage))] = signif$treeseg_lineage[which(!is.na(signif$treeseg_lineage))]
+signif$Cat = class_desc$Main.Label[match(signif$class, class_desc$Var1)]
+curr_class_desc = class_desc[which(class_desc$Var1 %in% signif$class),]
+signif$class = factor(signif$class, curr_class_desc$Var1)
+signif$lineage = factor(signif$lineage, names(sort(table(signif$lineage), decreasing = T)))
+signif$Cat = factor(signif$Cat, unique(curr_class_desc$Main.Label))
+
+
+ggplot(signif, aes(x = lineage, fill = class, color = class))  + geom_bar(lwd = 0.3)+  
+  theme_bw(base_size = 14)+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) + 
+  facet_grid(Cat~., scales = "free_y",space = "free_x",switch = "x") +
+  scale_fill_manual(values = curr_class_desc$Color) +
+  scale_color_manual(values = curr_class_desc$Border) + xlab("Clade") +
+  ylab("Genes")
+
+
+## if plotting per significance type
+A = plot_one_group(all, "subtree_lineage") + ggtitle("C")
+tree_seg_min_subtree = tree_seg_min_subtree[-which(is.na(tree_seg_min_subtree$treeseg_lineage)),]
+B = plot_one_group(tree_seg_min_subtree, "treeseg_lineage") + ggtitle("D")
+C = plot_one_group(smallest_subtree, "subtree_lineage") + ggtitle("E")
+
+grid.arrange(A,B,C, nrow = 1)
+
+## write an output file that can be used in downstream analysis to distinguish genes which are associated 
+## with a clade compared to those that aren't
+results_output = all_results[,c(1,2,3,9,10,11)]
+write.table(results_output, file = "associations_final.csv", sep = "\t", col.names = T, row.names = F, quote = F)
+
+
+
+
+

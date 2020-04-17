@@ -10,55 +10,47 @@ setwd("/Users/gh11/poppunk_pangenome/5_classify_genes/")
 complete_presence_absence = fread("../4_pairwise_roary/231019_corrected//complete_presence_absence.csv", sep = ",", header = T, stringsAsFactors = F)
 classification = read.table("classification_v2.csv", sep = "\t", header = T, stringsAsFactors = F, comment.char = "", quote = "")
 
-strains = colnames(complete_presence_absence)[-1]
-genes = complete_presence_absence[,1][-1]
-clusters = unlist(complete_presence_absence[1,])[-1]
 
-# ### Section to generate the random sampling
-# for (rep in 2:20){
-#   print("rep")
-#   print(rep)
-#   random_samples = c()
-#   for (curr in unique(clusters)) {
-#     samples = which(clusters == curr)
-#     samples = sample(x = samples ,size = 20, replace = T)
-#     random_samples = c(random_samples, samples)
-#   }
-#   res =  data.frame( cluster = numeric(0), desc = character(0), count = numeric(0), stringsAsFactors = F)
-#   for (i in random_samples){
-#     i = i+1
-#     cluster = unlist(complete_presence_absence[1,..i])
-#     vec = complete_presence_absence[,..i][-1]
-#     vec = unlist(genes[which(vec>0)]) ## get all genes that this sample has
-#     for (class in unique(classification$fill)) {
-#       curr_count = length(intersect(classification$gene[which(classification$fill == class)], vec))
-#       res = rbind(res, data.frame( cluster = cluster, desc = class, count = curr_count, stringsAsFactors = F))
-#     }
-#   }
-#   write.table(res, file = paste(rep, "_class_per_isolate.csv", sep = ""), sep = "\t", row.names = F, col.names = T, quote = F) ## randomly using only 15 per cluster
-# }
+
+strains = colnames(complete_presence_absence)[-1]
+genes = unlist(complete_presence_absence[,1][-1])
+clusters = unlist(complete_presence_absence[1,])[-1]
 
 ## add the phylogroup information from the graphics file
 graphics = read.table("/Users/gh11/Submissions/my_thesis/Chapter4/figures/cluster_graphics.csv", sep = ",",
                       header = T, comment.char = "")
 
-read_one_file <- function(rep_num){
-  res = read.table(file = paste(rep_num,"_class_per_isolate.csv", sep = ""), sep = "\t", header = T, stringsAsFactors = F, comment.char = "", quote = "")
-  summarised = aggregate(.~cluster+desc, res, mean)
-  return(summarised)
-}
+### Section to generate the random sampling
+num_clusters = length(unique(clusters))
+num_classes = length(unique(classification$fill))
 
-all = read_one_file(1)
-for (num in 2:20){
-  all = rbind(all, read_one_file(num))
-}
+genes_per_ecoli = data.frame( cluster = rep("", num_classes*num_clusters-1),
+                              desc = rep("", num_clusters*num_classes-1),
+                              mean = rep(0, num_clusters*num_classes-1),
+                              sd = rep(0, num_clusters*num_classes-1), stringsAsFactors = F)
 
-summarised_all= all %>%
-  group_by(cluster, desc) %>% 
-  summarise_each(list(mean = mean, sd = sd))
-summarised_all = data.frame(summarised_all, stringsAsFactors = F) 
-summarised_all = cbind(summarised_all, phylogroup= graphics$Phylogroup[match(summarised_all$cluster, graphics$Cluster)])
+row_index = 0
+for (curr in unique(clusters)) {
+  print(curr)
+  samples = which(clusters == curr)
+  samples = samples + 1
+  curr_presence_absence = data.frame(complete_presence_absence[,..samples])
+  curr_presence_absence = curr_presence_absence[-1,]
+  for (gene_class in unique(classification$fill)) {
+    gene_class_presence_absence = curr_presence_absence[which(genes %in% classification$gene[which(classification$fill == gene_class)]),]
+    num_genes = colSums(gene_class_presence_absence)
+    genes_per_ecoli$cluster[row_index] = curr
+    genes_per_ecoli$desc[row_index] = gene_class
+    genes_per_ecoli$mean[row_index] = mean(num_genes)
+    genes_per_ecoli$sd[row_index] = sd(num_genes)
+    row_index = row_index+1
+  }
+}  
+## save to a file??
+genes_per_ecoli$phylogroup = graphics$Phylogroup[match(genes_per_ecoli$cluster, graphics$Cluster)]
 
+
+## check if a PopPUNK cluster is an outlier
 is_outlier <- function(x) {
   ret_val = rep(0, length(x))
   ret_val[which(x < quantile(x, 0.25) - 1.5 * IQR(x) )] = 1.2
@@ -66,21 +58,19 @@ is_outlier <- function(x) {
   return(ret_val)
 }
 
-summarised_all = summarised_all %>%
+genes_per_ecoli = genes_per_ecoli %>%
   group_by(desc, phylogroup) %>%
   mutate(vjust = is_outlier(mean))
 
+genes_per_ecoli$outlier = genes_per_ecoli$cluster 
+genes_per_ecoli$outlier[which(genes_per_ecoli$vjust == 0)] = NA
 
-summarised_all$outlier = summarised_all$cluster 
-summarised_all$outlier[which(summarised_all$vjust == 0)] = NA
-
-summarised_all$cluster = factor(summarised_all$cluster, as.character(unique(unlist(summarised_all$cluster))))
+genes_per_ecoli$cluster = factor(genes_per_ecoli$cluster, as.character(unique(unlist(genes_per_ecoli$cluster))))
 
 colours = read.table("colours_v2.csv", sep = ",", comment.char = "", stringsAsFactors = F, header = T)
 
-summarised_all$desc = factor(summarised_all$desc, colours$Class)
-summarised_all = cbind(summarised_all, outlier = rep(NA, dim(summarised_all)[1]))
-summarised_all$cluster = as.character(unlist(summarised_all$cluster))
+genes_per_ecoli$desc = factor(summarised_all$desc, colours$Class)
+genes_per_ecoli$cluster = as.character(unlist(genes_per_ecoli$cluster))
 
 
 # ggplot(summarised_all, aes(x = cluster, y = mean, fill = desc)) + geom_bar(stat = "identity", color= "black", size = 0.2) +
@@ -88,8 +78,8 @@ summarised_all$cluster = as.character(unlist(summarised_all$cluster))
 #   facet_grid(. ~ phylogroup, scales='free',switch = "x", space = "free_x")
 
 
-summarised_all$desc = factor(summarised_all$desc, colours$Class)
-summarised_all$phylogroup = factor(summarised_all$phylogroup, c("B1","C","A","E","D","F","B2","U"))
+genes_per_ecoli$desc = factor(genes_per_ecoli$desc, colours$Class)
+genes_per_ecoli$phylogroup = factor(genes_per_ecoli$phylogroup, c("B1","C","A","E","D","F","B2","U"))
 
 
 ## If I only want to include some of the gene classes
@@ -97,8 +87,8 @@ summarised_all$phylogroup = factor(summarised_all$phylogroup, c("B1","C","A","E"
 #                                                               "Intermediate and specific", "Multicluster rare","Rare and specific","2-9 varied","Intermediate and rare",
 #                                                               "Secondary (specific)")),]
 
-summarised_typical = aggregate(by = list(summarised_all$desc), x = summarised_all$mean, mean)
-summarised_typical$sd = aggregate(by = list(summarised_all$desc), x = summarised_all$mean, sd)$x
+summarised_typical = aggregate(by = list(genes_per_ecoli$desc), x = genes_per_ecoli$mean, mean)
+summarised_typical$sd = aggregate(by = list(genes_per_ecoli$desc), x = genes_per_ecoli$mean, sd)$x
 summarised_typical = cbind(summarised_typical, col = colours$Colour[match(summarised_typical$Group.1, colours$Class)])
 summarised_typical$Group.1 = factor(summarised_typical$Group.1, rev(summarised_typical$Group.1))
 summarised_typical$col = as.character(summarised_typical$col)
@@ -110,7 +100,7 @@ summarised_typical$min_percent =summarised_typical$min/sum(summarised_typical$x)
 summarised_typical$max_percent =summarised_typical$max/sum(summarised_typical$x)*100
 
 
-A = ggplot(summarised_typical,aes(fill = summarised_typical$Group.1, x= "", y = summarised_typical$x))+ geom_bar(stat = "identity", color = "black", lwd = 0.1) + 
+ggplot(summarised_typical,aes(fill = summarised_typical$Group.1, x= "", y = summarised_typical$x))+ geom_bar(stat = "identity", color = "black", lwd = 0.1) + 
   coord_polar("y", start=0) +
   scale_fill_manual(values = rev(summarised_typical$col), guide = F) +  theme_minimal()+
   theme(
@@ -123,16 +113,16 @@ A = ggplot(summarised_typical,aes(fill = summarised_typical$Group.1, x= "", y = 
 
 
 
-summarised_all$Class = colours$Main.Class[match(as.character(summarised_all$desc), colours$Class)]
+genes_per_ecoli$Class = colours$Main.Class[match(as.character(genes_per_ecoli$desc), colours$Class)]
 plot_list = list()
 plot_list[["A"]] = A + ggtitle("A")
 
-write.table(summarised_all, file = "genes_per_ecoli.csv", sep = "\t",
+write.table(genes_per_ecoli, file = "genes_per_ecoli.csv", sep = "\t",
             col.names = T, row.names = F,quote = F)
 write.table(summarised_typical, file = "typical_ecoli.csv", sep = "\t",
             col.names = T, row.names = F,quote = F)
 
-
+### DONE
 i = 2
 for (curr_class in colours$Class) {
   curr = summarised_all[summarised_all$desc == curr_class,]

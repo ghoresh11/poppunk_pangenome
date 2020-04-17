@@ -41,7 +41,7 @@ B = ggplot(gene_classes, aes(x = label, fill = fill)) + geom_bar(color = "black"
   facet_grid(gene_class~., scales = "free") + 
   xlab("") + theme_classic(base_size = 14) + ylab("Number of genes") +
   scale_fill_manual(values = colours$Colour, guide = F)+ theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-  xlab("PopPUNK clusters in which gene is present") 
+  xlab("PopPUNK Clusters in which gene is present") 
 
 counts = data.frame(table(gene_classes$fill))
 colours$counts = counts$Freq[match(colours$Class, counts$Var1)]
@@ -50,9 +50,9 @@ colours$Main.Class=factor(colours$Main.Class, unique(colours$Main.Class))
 colours$Class=factor(colours$Class, colours$Class)
 
 A = ggplot(colours, aes(x = Main.Class, y = counts, fill = Class)) + geom_bar(stat = "identity", color = "black", lwd = 0.2) +
-  scale_fill_manual(values = colours$Colour) + theme_classic(base_size = 14) +
+  scale_fill_manual(values = colours$Colour, "Occurrence class") + theme_classic(base_size = 14) +
   scale_y_continuous(breaks = seq(0, max(35000), by = 3000), expand = c(0,0)) +
-  ylab("Genes") + xlab("") 
+  ylab("Genes") + xlab("Occurrence class") + theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 legend = as_ggplot(get_legend(A))
 legend
@@ -75,11 +75,11 @@ mean_without_zeros <- function(x) {
 gene_classes$means =  apply(X = freqs, 1, FUN = mean_without_zeros)
 
 ## plot showing how these gene categories are on a 2d plot
-C = ggplot(gene_classes, aes(y = means, x = total_presence, fill = fill)) + 
+ggplot(gene_classes, aes(y = means, x = total_presence, fill = fill)) + 
   geom_jitter(height = 0, alpha = 0.9, width = 0.1, pch = 21, color = "black", stroke = 0.1, size = 2) +
   scale_fill_manual(values = colours$Colour, name = "Category", guide = F) + theme_classic(base_size = 14) +
-  ylab("Mean frequency when present") + xlab("PopPUNK clusters in which gene is present") + 
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+  ylab("Mean frequency when present") + xlab("PopPUNK Clusters\nin which gene is present") + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) + ggtitle("C")
 
 ## decided to add pieplot to here
 summarised_typical = read.table("typical_ecoli.csv", sep = "\t", header = T, stringsAsFactors = F, comment.char = "")
@@ -99,12 +99,13 @@ D = ggplot(summarised_typical,aes(fill = summarised_typical$Group.1, x= "", y = 
   geom_text(aes(x= "", y=pos, label = x), size=4)
 
 ## 1100 x 630
-grid.arrange(A + ggtitle("A"),B + ggtitle("B"),C + ggtitle("C"),D, legend,layout_matrix = rbind(c(1,1,2,2,2,2,5,5),
+grid.arrange(A + ggtitle("A"),B + ggtitle("B"),ggplot() + theme_void(), D, legend,layout_matrix = rbind(c(1,1,2,2,2,2,5,5),
                                            c(1,1,2,2,2,2,5,5),
                                            c(3,3,2,2,2,2,4,4),
                                            c(3,3,2,2,2,2,4,4)))
-
-## need to save the new classification to a file
+## save as H315*W275
+C + ggtitle(C)
+ ## need to save the new classification to a file
 #write.table(gene_classes, "classification_v2.csv", quote = F, row.names = T, col.names = T, sep = "\t")
 
 

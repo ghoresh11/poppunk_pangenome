@@ -9,6 +9,20 @@ library(ape)
 
 setwd("/Users/gh11/poppunk_pangenome/6_missing_specific_genes/")
 
+
+## get genes of a particular cluster 
+all_specific_genes = read.csv("specific_genes_detailed.csv", sep = "\t", comment.char = "",
+                                stringsAsFactors = F, quote = "", header = T)
+st10 = all_specific_genes[which(all_specific_genes$cluster == 12),]
+write.table(st10, file = "/Users/gh11/Desktop/ST10.csv", sep = ",", quote = T, row.names = F, col.names = T)
+
+all_missing_genes =read.csv("missing_genes_detailed.csv", sep = "\t", comment.char = "",
+                            stringsAsFactors = F, quote = "", header = T)
+st10_missing = all_missing_genes[all_missing_genes$cluster == 12,]
+
+
+
+
 graphics = read.table("/Users/gh11/Submissions/my_thesis/Chapter3/figures/cluster_graphics.csv", sep = ",",
                       header = T, comment.char = "", stringsAsFactors = F)
 graphics = graphics[-which(graphics$Cluster %in% c(21, 43, 49)),]
@@ -44,9 +58,8 @@ B = ggplot(multicluster, aes(x = Cluster, y = Gene, fill = Freq)) + geom_tile(co
   facet_grid(~phylo, scales = "free",  space = "free",switch = "x") + ggtitle("Multicluster") 
 
 
-
 ## plot on a tree
-tree = read.tree("../../7_AMR_vir_plasmid/smaller_tree/raxml_tree_mod.nwk")
+tree = read.tree("../7_AMR_vir_plasmid/smaller_tree/raxml_tree_mod.nwk")
 tree = root(tree,outgroup = "NC_011740")
 tree = drop.tip(tree, tip =  "NC_011740")
 for (i in c(21,43,49)){

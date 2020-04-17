@@ -48,6 +48,8 @@ with open("/Users/gh11/poppunk_pangenome/5_classify_genes/gene_classification.cs
         toks = line.strip().split(",")
         gene_to_class[toks[0]] = toks[1]
 
+
+
 ## ## create a graph where i keep track of which clusters have this particular gene
 nodes = {}
 G = nx.Graph()

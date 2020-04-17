@@ -15,11 +15,8 @@ md_names = as.character(sapply(sapply(sapply(sapply(orig_md$New_annot_loc, strsp
                                       strsplit, split = ".",fixed = T), head, n=1))
 rownames(orig_md) = md_names
 
-graphics = read.table("/Users/gh11/Submissions/my_thesis/Chapter3/figures/cluster_graphics.csv",
-                      sep = ",", comment.char = "", header = T, stringsAsFactors = F)
-
-
-graphics = graphics[order(as.numeric(graphics$Cluster), decreasing = F),]
+cluster_graphics = read.table("/Users/gh11/Submissions/my_thesis/Chapter4//figures/cluster_graphics.csv",
+                              sep = ",", comment.char = "", header = T, stringsAsFactors = F)
 
 ### plotting heatmaps of genes along the tree
 tree = read.tree("smaller_tree/raxml_tree_mod.nwk")
@@ -30,103 +27,25 @@ tree = drop.tip(tree, tip =  "NC_011740")
 tree_md = read.table("smaller_tree/smaller_tree.csv", sep = ",", comment.char = "", stringsAsFactors = F,
                      quote = "", header = T)
 
+cluster_order = # (taken from tree)
+  rev(c(8,36,43,24,42,32,26,49,9,34,48,5,21,15,6,14,39,22,40,45,30,28,12,35,23,1,16,10,51,19,7,37,46,29,
+        4,18,25,13,3,41,17,11,27,20,2,47,38,33,31,44))
 
 ############## FUNCTIONS #############
 
-plot_medians<- function(md, num, ylab){
-  x = aggregate(x = md$num_new_genes, by = list(md$Poppunk_cluster), FUN = mean)
-  sd_x = aggregate(x = md$num_new_genes, by = list(md$Poppunk_cluster), FUN = sd)
-  y = aggregate(x = num, by = list(md$Poppunk_cluster), FUN = mean)
-  sd_y = aggregate(x = num, by = list(md$Poppunk_cluster), FUN = sd)
-  cluster = x$Group.1
-  ## just in case, match everything:
-  sd_x = sd_x[match(x$Group.1, sd_x$Group.1),]
-  y = y[match(x$Group.1, y$Group.1),]
-  sd_y = sd_y[match(x$Group.1, sd_y$Group.1),]
+plot_boxplot_amr <- function(df, breaks, ylab) {
+  df$PopPunk_cluster = factor(df$PopPunk_cluster, cluster_order)
   
-  df = data.frame(cluster = cluster,
-                  num_genes = x$x, num_genes_sd = sd_x$x,
-                  num_res_genes = y$x, num_res_genes_sd = sd_y$x, stringsAsFactors = F)
-  p = ggplot(df, aes(x = num_genes, y = num_res_genes, label = cluster)) + 
-    geom_text() + xlab("Median number of genes per isolate") +
-    ylab(paste("Median number of ",ylab ," per isolate", sep = "")) + theme_bw(base_size = 14)
-  return(p)
-}
-
-plot_boxplot <- function(md, vec, breaks, ylab){
-  md = cbind(md, vec)
-  cluster_order = # (taken from tree)
-    rev(c(8,36,43,24,42,32,26,49,9,34,48,5,21,15,6,14,39,22,40,45,30,28,12,35,23,1,16,10,51,19,7,37,46,29,
-      4,18,25,13,3,41,17,11,27,20,2,47,38,33,31,44))
-  md$Poppunk_cluster = factor(md$Poppunk_cluster, cluster_order)
-  graphics = graphics[match(cluster_order, graphics$Cluster),]
-  p = ggplot(md, aes(x = Poppunk_cluster, y = vec, shape = Poppunk_cluster, color = Poppunk_cluster)) + 
-    geom_jitter(width = 0.2, height = 0.2, size = 0.5, stroke = 1.2, alpha = 0.5) +
-    geom_boxplot(outlier.shape = NA, color = "black", fill = NA,) +
-    scale_color_manual(values = graphics$Color) + scale_shape_manual(values = graphics$Shape) +
-    theme_classic(base_size = 14) + theme(legend.position = "None") + 
-    scale_y_continuous(breaks = breaks) + ylab(ylab) + xlab("Cluster") +
+  p = ggplot(df, aes(x = PopPunk_cluster, y = count, fill = MDR)) + geom_boxplot() +
+    geom_hline(yintercept = 3, linetype = 2, color = "red", lwd = 0.8) +
+    theme_bw(base_size = 14) + xlab("PopPUNK Cluster") + ylab(ylab) +
+    scale_fill_manual(values = c("#e0e0e0","#fddbc7"))+ 
+    scale_y_continuous(breaks = breaks) + ylab(ylab) + xlab("PopPUNK Cluster") +
     coord_flip()
+  
   return(p)
 }
 
-calculate_stats <- function(vec, md) {
-  rs = sample(x  = unique(md$Poppunk_cluster),size = 10000, replace = T)
-  res = rep(0, 10000)
-  for (index in 1:10000) {
-    cluster = rs[index]
-    curr = vec[which(md$Poppunk_cluster == cluster)]
-    res[index] = sample(size = 1, x = curr)
-  } 
-  signif = c()
-  for (cluster in unique(md$Poppunk_cluster)) {
-    curr_test = wilcox.test(res, vec[which(md$Poppunk_cluster == cluster)], alternative = "less")
-    if (curr_test$p.value<(0.05/47)) {
-      signif = c(signif, cluster)
-    }
-  }
-  return(signif)
-}
-
-read_one_file <- function(filename, ylab, desc_file, all= F){
-  df = read.table(filename, sep = ",", header = T, comment.char = "",
-                  quote = "", stringsAsFactors = F, row.names = 1)
-  df_no_trunc = df
-  df_no_trunc[df_no_trunc=="1*"] = 0
-  df_no_trunc = data.frame(lapply(df_no_trunc, as.numeric))
-  rownames(df_no_trunc) = row.names(df)
-  ## get the metadata file in the same order as the plasmids file
-  md = orig_md[match(rownames(df_no_trunc), rownames(orig_md)),]
-  num = rowSums(df_no_trunc)
-  add_orig_md = num[match(rownames(orig_md), rownames(df_no_trunc))]
-  orig_md = cbind(orig_md, add_orig_md)
-  
-  descs = read.table(desc_file, sep = ",", comment.char = "", quote = "", stringsAsFactors = F, header = T)
-  
-  if (all) { sigs = unique(md$Poppunk_cluster)} else {
-    sigs = calculate_stats(vec = num, md = md)
-  }
-  
-  empty_descs = descs[-which(is.na(descs)),]
-  res = cbind(data.frame(cluster = character(0), freq = character(0), stringsAsFactors = F), empty_descs)
-  
-  for (s in sigs) {
-    curr_df = df_no_trunc[which(md$Poppunk_cluster == s),]
-    genes = colSums(curr_df)/dim(curr_df)[1]
-    all_genes = sapply(aggregate(df_no_trunc, list(md$Poppunk_cluster), mean)[,-1], mean)
-    genes = genes[which(genes > all_genes + 0.1)]
-    curr = descs[match(names(genes), descs$identifier),]
-    curr = cbind(cluster = rep(s, length(genes)), freq = genes, curr)
-    res = rbind(res, curr)
-  }
-  p = plot_boxplot(md, num, seq(from=0, to=max(num),by=2), ylab)
-  #  p = plot_medians(md, num, ylab)
-  if (all) { write.table(x = res, file = paste("results/",ylab, "_all.csv", sep = ""), sep = ",", row.names = F, col.names = T, quote = F)} else {
-    write.table(x = res, file = paste("results/",ylab, "_signif.csv", sep = ""), sep = ",", row.names = F, col.names = T, quote = F)
-  }
-  if (all) {return(res)}
-  return(list(orig_md, sigs, p))
-}
 
 get_gene_for_one_cluster <- function(cluster, md, df){
   df = df[which(md$Poppunk_cluster == cluster),]
@@ -143,7 +62,7 @@ get_gene_for_one_cluster <- function(cluster, md, df){
   return(res)
 }
 
-plot_on_tree <- function(filename, desc_file, tree, signif){
+plot_on_tree <- function(filename, desc_file, tree, signif, display_names = T){
   df = read.table(filename, sep = ",", header = T, comment.char = "",
                   quote = "", stringsAsFactors = F, row.names = 1)
   md = orig_md[match(rownames(df), rownames(orig_md)),]
@@ -157,6 +76,15 @@ plot_on_tree <- function(filename, desc_file, tree, signif){
   ## change the order of the columns
   res = res[,order(colSums(res), decreasing = T)]
   res = res[,-which(sapply(FUN = max, X = res)<0.1)] ## to remove very rare genes
+  
+  ## create an output file for the cluster summaries
+  df_out = data.frame(cluster = rownames(res),
+                      label = rep("-", dim(res)[1]), stringsAsFactors = F)
+  for (i in 1:dim(res)[1]) {
+    props = sort(round(res[i,][which(res[i,] >0)], digits = 2), decreasing = T)
+    df_out$label[i] = paste(names(props), props, sep = ":", collapse = "/")
+  }
+  write.table(df_out, file = paste(filename, "_per_cluster.csv", sep = ""), col.names = T, row.names = F, quote = F, sep = ",")
   
   descs = read.table(desc_file, sep = ",", header = T, stringsAsFactors = F, quote = "")
   new_labs = descs$gene[match(colnames(res), descs$identifier)]
@@ -183,178 +111,237 @@ plot_on_tree <- function(filename, desc_file, tree, signif){
     theme(legend.position="right") + geom_tiplab(align = T)
   # tree$tip.label = factor(tree$tip.label, tree$tip.label)
   p2 = gheatmap(p = p, data = res, offset = 0.1, width=5, color = "black", 
-                high = "#023858", low = "#fff7fb", colnames = F, 
-                font.size = 3)
+                high = "#023858", low = "#fff7fb", colnames = display_names, 
+                font.size = 4, colnames_angle = 90)
+  
+  
+  
   return(p2)
 }
 
-get_median_per_cluster <- function(filename,lab){
-  df = read.table(filename, sep = ",", header = T, comment.char = "",
-                  quote = "", stringsAsFactors = F, row.names = 1)
-  df[df == "1*"] = 0
-  md = orig_md[match(rownames(df), rownames(orig_md)),]
-  df = data.frame(lapply(df, as.numeric))
-  names = unique(md$Poppunk_cluster)
-  res = c()
-  res2 = c()
-  for (clstr in names) {
-    num1 = median(rowSums(df[which(md$Poppunk_cluster == clstr),]))
-    
-    num2 = length(which(colSums(df[which(md$Poppunk_cluster == clstr),])/length(which(md$Poppunk_cluster == clstr)) > 0.1))
-    res = c(res, num1)
-    res2 = c(res2, num2)
-  }
-  df_for_plot = data.frame(median = res,
-                           num_genes_total = res2,
-                           name = names, stringsAsFactors = F)
-  print(ggplot(df_for_plot, aes(x = median, y = num_genes_total, label = name)) + geom_text(position=position_jitter(width=0.4,height=0.4))+
-          theme_bw(base_size = 14) + xlab(paste("Median", lab, "per isolate")) + ylab(paste("Total", lab,"genes in PopPUNK cluster")))
-  names(res) = names
-  return(res)
-}
-
-summary_by_column <- function(filename){
-  ## look at which genes are the most common in the population (they have a high average freq)
-  ## find columns which are correlated/anticorrelated
-  df = read.table(filename, sep = ",", header = T, comment.char = "",
-                  quote = "", stringsAsFactors = F, row.names = 1)
-  df[df == "1*"] = 0
-  md = orig_md[match(rownames(df), rownames(orig_md)),]
-  df = data.frame(lapply(df, as.numeric))
-}
-
-
-## without truncated
 
 ### AMR genes
-amr_file = "results/resfinder.csv"
-res = read_one_file(amr_file, "AMR_genes", "DBs/break_names/resfinder_genes_fixed.csv")
-orig_md = res[[1]]
-signif = res[[2]]
-A = res[[3]]
-colnames(orig_md)[dim(orig_md)[2]] = "amr"
+amr_results = read.table("/Users/gh11/poppunk_pangenome/7_AMR_vir_plasmid/results/resfinder.csv", sep = ",",
+                         comment.char = "", stringsAsFactors = F, header = T, row.names = 1)
+amr_results[amr_results == "1*"] = 0
+amr_results_2 = mutate_all(amr_results, function(x) as.numeric(as.character(x)))
+rownames(amr_results_2) = rownames(amr_results)
+amr_results = amr_results_2
+## all amr
+all_amr = read.table("/Users/gh11/poppunk_pangenome/7_AMR_vir_plasmid/DBs/break_names/resfinder_genes_fixed.csv", sep = ",",
+                     header = T, stringsAsFactors = F, comment.char = "", quote = "")
+all_amr = all_amr[match(colnames(amr_results),all_amr$identifier),]
+antibiotic_classes = read.table("antibiotic_classes.csv", sep = ",", quote = "", comment.char = "", header = T, stringsAsFactors = F)
+
+
+# # 1.Count how many antibiotic classes each strain is resistant to
+# antibiotic_classes = data.frame(strain = rownames(amr_results),
+#                                 count = rep(0, dim(amr_results)[1]),
+#                                 names =  rep("-", dim(amr_results)[1]), stringsAsFactors = F)
+# 
+# for (i in 1:dim(antibiotic_classes)[1]) {
+#   print(i)
+#   results =  unique(all_amr$antimicrobial.category[which(amr_results[i,]>0)])
+#   if (length(results) == 0) {next}
+#   antibiotic_classes$names[i] = paste(sort(results), collapse = ";")
+#   antibiotic_classes$count[i] = length(results)
+# }
+# antibiotic_classes$PopPunk_cluster = orig_md$Poppunk_cluster[match(antibiotic_classes$strain, rownames(orig_md))]
+# antibiotic_classes$Phylogroup = cluster_graphics$Phylogroup[match(antibiotic_classes$PopPunk_cluster, cluster_graphics$Cluster)]
+median_classes = aggregate(x = antibiotic_classes$count, by = list(antibiotic_classes$PopPunk_cluster), median)
+cluster_graphics$MDR = rep("No",dim(cluster_graphics)[1])
+cluster_graphics$MDR[which(cluster_graphics$Cluster %in% median_classes$Group.1[median_classes$x >=3])] = "Yes"
+# antibiotic_classes$MDR = cluster_graphics$MDR[match(antibiotic_classes$PopPunk_cluster, cluster_graphics$Cluster)]
+# write.table(antibiotic_classes, file = "antibiotic_classes.csv", sep = ",", col.names = T, row.names = F, quote = F)
+
+A = plot_boxplot_amr(antibiotic_classes, breaks = seq(from = 0, to = 8, by = 2), ylab = "Antimicrobial categories")
+signif = cluster_graphics$Cluster[cluster_graphics$MDR == "Yes"]
 B = plot_on_tree("results/resfinder.csv","DBs/break_names/resfinder_genes_fixed.csv", tree, signif )
-med_amr = get_median_per_cluster("results/resfinder.csv", "resistance genes")
-grid.arrange(A,B,  layout_matrix = rbind(c(1,2,2)))
-A
+grid.arrange(A + theme(legend.position = "bottom") + ylab("Antimicrobial Classes") + ggtitle("A"),
+             B + ggtitle("B"),  layout_matrix = rbind(c(1,2,2)))
 
 
-## in order to make the output CSV file and to add to the text
-# df = read_one_file(amr_file, "AMR_genes", "DBs/break_names/resfinder_genes_fixed.csv", all = T)
-# amr_menes = aggregate(x = df$freq, by = list(df$identifier), FUN = median)
-# amr_count = table(df$identifier)
-# amr_menes$count = amr_count[match(amr_menes$Group.1, names(amr_count))]
-# df$identifier = factor(df$identifier, amr_menes$Group.1[order(amr_menes$x, decreasing = T)])
-# ggplot(df, aes(x = identifier, y = freq)) + geom_boxplot()+ theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-#   geom_hline(yintercept = 0.2)
+
+
+
+
 
 ### virulence genes
-vir_file = "results/virulence.csv"
-res = read_one_file(vir_file, "virulence", "DBs/break_names/virulence.csv")
-orig_md = res[[1]]
-signif = res[[2]]
-A = res[[3]] 
-colnames(orig_md)[dim(orig_md)[2]] = "vir"
-B = plot_on_tree(vir_file,"DBs/break_names/virulence.csv", tree, signif )
-med_vir = get_median_per_cluster("results/virulence.csv", "virulence genes")
-grid.arrange(A, B, layout_matrix = rbind(c(1,2,2)))
-B = B + theme(legend.position = "right")
-legend = as_ggplot(get_legend(B)) 
-legend
-
-df = read_one_file(vir_file, "virulence", "DBs/break_names/virulence.csv", all = T)
-# unique(df$cluster[which(grepl(x = df$gene, pattern = "stx", fixed = T))])
-# unique(df$cluster[which(grepl(x = df$gene, pattern = "eae", fixed = T))])
-# unique(df$cluster[which(grepl(x = df$gene, pattern = "aatA", fixed = T))])
-# unique(df$cluster[which(grepl(x = df$gene, pattern = "aggR", fixed = T))])
-# unique(df$cluster[which(grepl(x = df$gene, pattern = "aaiC", fixed = T))])
-# unique(df$cluster[which(grepl(x = df$gene, pattern = "ehxA", fixed = T))])
-
-### plasmids
-res = read_one_file("results/plasmid.csv", "plasmid", "DBs/break_names/virulence.csv")
-orig_md = res[[1]]
-signif = res[[2]]
-A = res[[3]]
-colnames(orig_md)[dim(orig_md)[2]] = "plasmid"
-B = plot_on_tree("results/plasmid.csv","DBs/break_names/plasmid.csv", tree, signif)
-med_plasmid = get_median_per_cluster("results/plasmid.csv", "plasmid replicons")
-B
-A
-grid.arrange(A,B,  layout_matrix = rbind(c(1,2,2)))
-
-### plot a 3-way scatter plot to see the relationships between having any of these genes
-med = data.frame(cluster = names(med_amr),
-                 amr = med_amr,
-                 vir= med_vir, plasmid = med_amr, stringsAsFactors = F)
-ggplot(med, aes(x = med_plasmid, y = med_amr, label = cluster)) + geom_text(position=position_jitter(width=0.4,height=0.4))+
-  theme_bw(base_size = 14) + xlab("Median plasmid replicons per isolate") + ylab("Median resistance genes per isolate")
-
-ggplot(med, aes(x = med_plasmid, y = med_vir, label = cluster)) + geom_text(position=position_jitter(width=0.4,height=0.4))+
-  theme_bw(base_size = 14) + xlab("Median plasmid replicons per isolate") + ylab("Median virulence genes per isolate")
-
-ggplot(med, aes(x = med_amr, y = med_vir, label = cluster)) + geom_text(position=position_jitter(width=0.4,height=0.4))+
-  theme_bw(base_size = 14) + xlab("Median resistance genes per isolate") + ylab("Median virulence genes per isolate")
+vir_results = read.table("/Users/gh11/poppunk_pangenome/7_AMR_vir_plasmid/results/virulence.csv", sep = ",",
+                         comment.char = "", stringsAsFactors = F, header = T, row.names = 1)
+vir_results[vir_results == "1*"] = 0
+vir_results_2 = mutate_all(vir_results, function(x) as.numeric(as.character(x)))
+rownames(vir_results_2) = rownames(vir_results)
+vir_results = vir_results_2
 
 
+pathotype_genes = read.table("DBs/break_names/pathotypes.csv", sep = ",", header = T, stringsAsFactors = F)
+all_virulence_genes = read.table("DBs/break_names/virulence.csv", sep = ",", header = T, stringsAsFactors = F)
+identifiers = all_virulence_genes$identifier[which(all_virulence_genes$gene %in% pathotype_genes$Gene)]
+filtered_vir_results =  vir_results[,colnames(vir_results) %in% identifiers]
 
 
-## rewriting the metadata nicely:
-orig_md = cbind(orig_md, phylogroup = graphics$Phylogroup[match(orig_md$Poppunk_cluster, graphics$Cluster)])
-orig_md = orig_md[c(1:6, 9, 21:23, 34:36, 38:42)]
-write.table(orig_md, file = "../SELECTED_METADATA.csv", sep = "\t", col.names = T, row.names = F, quote = F)
+## predict the pathotype of isolate
+pathotypes = data.frame(strain = rownames(filtered_vir_results),
+                        pathotype = orig_md$Pathotype[match(rownames(filtered_vir_results), rownames(orig_md))],
+                        PopPUNK_cluster = orig_md$Poppunk_cluster[match(rownames(filtered_vir_results), rownames(orig_md))], 
+                        stringsAsFactors = F)
+pathotypes = cbind(pathotypes, filtered_vir_results)
 
+## change the pathotype column to include only clear ones
+pathotypes$pathotype[which(!pathotypes$pathotype %in% c("nd","expec","epec","stec","etec","eaec"))] = "nd"
+pathotypes$pathotype = toupper(pathotypes$pathotype)
 
+## this works for ExPEC
+for (i in 1:length(pathotypes$strain)) {
+  strain = pathotypes$strain[i]
+  index = which(rownames(orig_md) == strain)
+  if (orig_md$Isolation[index] %in% c("blood","urine")) {
+    if (!pathotypes$pathotype[i] %in% c("EXPEC","ND")) { ## sanity check
+      print(pathotypes$pathotype[i])
+    }
+    pathotypes$pathotype[i] = "ExPEC"
+  }
+}
 
-### understanding the which genes are stable in which clusters
-## and how many genes are stable in each cluster and which
-
-
-# orig_md$Poppunk_cluster = factor(orig_md$Poppunk_cluster, graphics$Cluster)
-# 
-# 
-# ## change Y in this plot to look at plasmids/amr/virulence/stx
-# orig_md$Isolation[which(!orig_md$Isolation %in% c("urine","feces","blood"))] = "other"
-# ggplot(orig_md, aes(x = phylogroup, y = plasmids, color = Poppunk_cluster, shape = Poppunk_cluster)) + 
-#   geom_jitter(width = 0.3, height = 0.2, size = 1.2, stroke = 1.2, alpha = 0.5) +
-#   scale_color_manual(values = graphics$Color) + scale_shape_manual(values = graphics$Shape) +
-#   theme_classic(base_size = 14) + theme(legend.position = "None") +  
-#   scale_y_continuous(breaks = seq(from = 0, to = 28, by = 1))
-
-
-# ### for astrid
-for_astrid = data.frame(ID = orig_md$ID,
-                        PopPUNK_cluster = orig_md$Poppunk_cluster,
-                        ST =orig_md$ST,
-                        Phlygroup = orig_md$phylogroup,
-                        Pathotype = orig_md$Pathotype,
-                        Isolation = orig_md$Isolation,
-                        Country = orig_md$Country,
-                        Continent = orig_md$Continent,
-                        Year = orig_md$Year,
-                        Publication = orig_md$Publication,
-                        Reads_loc = orig_md$Reads_Location,
-                        Assembly_loc = orig_md$Assembly_Location,
-                        Annot_loc = orig_md$New_annot_loc, stringsAsFactors = F
-)
-chosen = read.table("/Users/gh11/poppunk_pangenome/X_tree/210619_annots.txt", header = F, 
-                    sep = ",", comment.char = "", quote = "", stringsAsFactors = F)
-for_astrid = for_astrid[for_astrid$Annot_loc %in% chosen$V1, ]
-for_astrid = for_astrid[-which(for_astrid$PopPUNK_cluster %in% c(21,43,49)),]
-for (i in 1:dim(for_astrid)[1]){
-  assemblies = strsplit(x = for_astrid$Assembly_loc[i], split = ",", fixed = T)[[1]]
-  if (length(assemblies)>1){
-    cnt = cnt + 1
-    annot_name = strsplit(tail(strsplit(x = for_astrid$Annot_loc[i], split = "/", fixed = T)[[1]],1), split = ".gff")[[1]][1]
-    for (a in assemblies){
-      if (grepl(x = a, pattern = annot_name)){
-        for_astrid$Assembly_loc[i] = a
+for (gene in pathotype_genes$Gene) {
+  print(gene)
+  p = pathotype_genes$Pathotype[pathotype_genes$Gene == gene]
+  curr_idents = all_virulence_genes$identifier[which(all_virulence_genes$gene == gene)]
+  for (ident in curr_idents) {
+    for (i in 1:dim(pathotypes)[1]) {
+      if (pathotypes$pathotype[i] == "ExPEC") {next}
+      if (pathotypes[i,which(colnames(pathotypes) == ident)] == 1) {
+        if (pathotypes$pathotype[i] == "ND") {
+          pathotypes$pathotype[i] = p
+        } else if (!grepl(x = pathotypes$pathotype[i], pattern = p, fixed = T)) {
+          pathotypes$pathotype[i] = paste(pathotypes$pathotype[i], "/",p)
+        }
       }
     }
   }
 }
-write.table(for_astrid, "/Users/gh11/Cinzia/ecoli_dataset.csv", sep = ",", col.names = T, row.names = F, quote = T)
+## correct to include pathotypes that are combinations of other pathotypes
+for (i in 1:dim(pathotypes)[1]) {
+  if (grepl(x = pathotypes$pathotype[i], pattern = "EPEC", fixed = T) && 
+      grepl(x = pathotypes$pathotype[i], pattern = "STEC", fixed = T) ) {
+    pathotypes$pathotype[i] = "EHEC"
+  }
+  else if (grepl(x = pathotypes$pathotype[i], pattern = "STEC", fixed = T) && 
+           grepl(x = pathotypes$pathotype[i], pattern = "EAEC", fixed = T) ) {
+    pathotypes$pathotype[i] = "EAEC+STEC"
+  }
+  elements = unlist(strsplit(x = pathotypes$pathotype[i], split = " / ", fixed = T))
+  if (("EPEC" %in% elements) && ("aEPEC" %in% elements) && length(elements) == 2) {
+    pathotypes$pathotype[i] = "EPEC"
+  }
+  else if ( ("ETEC" %in% elements) &&
+           (("EPEC" %in% elements) || ("aEPEC" %in% elements))) {
+    pathotypes$pathotype[i] = "EPEC/ETEC"
+  }
+}
 
-for_astrid = for_astrid[which(for_astrid$PopPUNK_cluster %in% c(12,32,34,37,40)),]
-write.table(for_astrid, "/Users/gh11/Desktop/for_astrid.csv", sep = ",", quote = T, col.names = T, row.names = F)
+pathotypes$pathotype[pathotypes$pathotype %in% c("EPEC","aEPEC")] = "aEPEC/EPEC"
+write.table(x = pathotypes, file = "pathotype_per_isolate.csv", sep = ",",
+            col.names = T, row.names = F, quote = F)
+
+
+
+counts_per_cluster = table(pathotypes$PopPUNK_cluster,pathotypes$pathotype)
+pathotype_per_cluster = data.frame(PopPUNK_cluster = rownames(counts_per_cluster),
+                                   Pathotype_details = rep("", dim(counts_per_cluster)[1]),
+                                   Pathotype_label =  rep("", dim(counts_per_cluster)[1]),
+                                   stringsAsFactors = F)
+
+for (i in 1:dim(counts_per_cluster)[1]) {
+  counts_per_cluster[i,] = round(counts_per_cluster[i,]/sum(counts_per_cluster[i,]), digits = 2)
+  chosen = which(counts_per_cluster[i,] > 0)
+  pathotype_per_cluster$Pathotype_details[i] = paste(colnames(counts_per_cluster)[chosen], "(",
+  counts_per_cluster[i,chosen],")", sep = "", collapse = ";")
+  
+  chosen = which(counts_per_cluster[i,] > 0.5)
+  if (length(chosen) == 0) {
+    pathotype_per_cluster$Pathotype_label[i] = "No prevalent pathotype"
+    next
+  }
+  pathotype_per_cluster$Pathotype_label[i] = colnames(counts_per_cluster)[chosen]
+}
+write.table(x = pathotype_per_cluster, file = "pathotypes_per_cluster.csv", sep = ",",
+            col.names = T, row.names = F, quote = F)
+
+
+### create the boxplot
+vir_per_isolate = data.frame(strain = rownames(vir_results),num_genes = rowSums(vir_results), stringsAsFactors = F)
+vir_per_isolate$PopPUNK_cluster = orig_md$Poppunk_cluster[match(vir_per_isolate$strain, rownames(orig_md))]
+vir_per_isolate$PopPUNK_cluster = factor(vir_per_isolate$PopPUNK_cluster, cluster_order)
+
+vir_per_isolate$pathotype = pathotype_per_cluster$Pathotype_label[match(vir_per_isolate$PopPUNK_cluster, pathotype_per_cluster$PopPUNK_cluster)]
+vir_per_isolate$pathotype = factor(vir_per_isolate$pathotype, c("ExPEC", "EHEC", "STEC","aEPEC/EPEC","EAEC","EIEC","No prevalent pathotype","ND"))
+
+A = ggplot(vir_per_isolate, aes(x = PopPUNK_cluster, y = num_genes, fill = pathotype)) + geom_boxplot() +
+  coord_flip() + theme_classic(base_size = 14) + ylab("Virulence factors") +xlab("PopPUNK Cluster") +
+  scale_y_continuous(breaks = seq(from= 0, to = 25, by = 4))+
+  scale_fill_manual(values = c( brewer.pal(n=7, "Set2"), NA), name = "Pathotype")
+
+
+vir_per_isolate$phylogroup = cluster_graphics$Phylogroup[match(vir_per_isolate$PopPUNK_cluster, cluster_graphics$Cluster)]
+ggplot(vir_per_isolate, aes( y = num_genes, x = pathotype)) + geom_boxplot() +
+  coord_flip() + theme_classic(base_size = 14) + ylab("Virulence genes") +xlab("Pathotype") +
+  scale_y_continuous(breaks = seq(from= 0, to = 25, by = 4)) 
+
+B = plot_on_tree("results/virulence.csv","DBs/break_names/virulence.csv", tree, c(),display_names = F)
+B
+
+grid.arrange(A, B, layout_matrix = rbind(c(1,1,2,2,2)))
+
+
+### relationship between resistance and virulence
+
+amr =  aggregate(x = antibiotic_classes$count, by = list(antibiotic_classes$PopPunk_cluster), FUN = median)
+vir = aggregate(x = vir_per_isolate$num_genes, by = list(vir_per_isolate$PopPUNK_cluster), FUN = median)
+amr = amr[match(vir$Group.1, amr$Group.1),]
+vir_and_amr = data.frame(PopPUNK_cluster = amr$Group.1,
+                         amr = amr$x,
+                         vir = vir$x,
+                         pathotype = pathotype_per_cluster$Pathotype_label[match(as.character(amr$Group.1), pathotype_per_cluster$PopPUNK_cluster)],
+                         stringsAsFactors = F)
+
+
+vir_and_amr$pathotype = factor(vir_and_amr$pathotype, c("ExPEC", "EHEC", "STEC","aEPEC/EPEC","EAEC","EIEC","No prevalent pathotype","ND"))
+pd <- position_dodge(0.3)
+ggplot(vir_and_amr, aes(x = amr, y = vir, fill = pathotype, label = PopPUNK_cluster)) + geom_point(pch = 21, size = 8) +
+  geom_text()+
+  theme_bw(base_size = 14) +
+  scale_fill_manual(values = c( brewer.pal(n=7, "Set2"), NA), name = "Pathotype") +
+  scale_x_continuous(breaks = seq(from=0, to = 9, by = 1)) +
+  scale_y_continuous(breaks = seq(from = 0, to = max(vir$x), by = 2)) + xlab("Median number of antimicrobial classes each isolate is resistant to") +
+  ylab("Median number of virulence factors per isolate") +
+  geom_vline(xintercept = 3, lty = 2, colour = "red")
+
+
+
+
+calc_props_one_cluster <- function(curr_cluster) {
+  curr = antibiotic_classes[which(antibiotic_classes$PopPunk_cluster == curr_cluster),]
+  curr$path = vir_per_isolate$num_genes[vir_per_isolate$PopPUNK_cluster == curr_cluster]
+  res = data.frame(table(curr$count, curr$path),stringsAsFactors = F)
+  res$Freq = res$Freq/dim(curr)[1]
+  res$name = paste(res$Var1, res$Var2, sep ="-")
+  return(res)
+}
+
+all_res = calc_props_one_cluster(pathotype_per_cluster$PopPUNK_cluster[1])
+for (i in 2:length(pathotype_per_cluster$PopPUNK_cluster)){
+  res = calc_props_one_cluster(pathotype_per_cluster$PopPUNK_cluster[i])
+  in_both = res$Freq[match(all_res$name,res$name)]
+  in_both[which(is.na(in_both))] = 0
+  all_res$Freq = all_res$Freq + in_both
+  all_res = rbind(all_res, res[which(!res$name %in% all_res$name),])
+}
+
+all_res$Var1 = as.numeric(all_res$Var1)
+all_res$Var2 = as.numeric(all_res$Var2)
+ggplot(all_res, aes(x = Var1, y = Var2, size = Freq)) + geom_point() +
+  scale_size_continuous(breaks = seq(from = 0.1, to = 2, by = 0.1), range = c(0,9))
 
 

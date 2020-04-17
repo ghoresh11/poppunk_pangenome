@@ -1,6 +1,6 @@
 import seaborn as sns
 
-genes_of_interest_file = "/Users/gh11/Documents/truncated_genes_40.txt"
+genes_of_interest_file = "/Users/gh11/Documents/longer_26.txt"
 
 with open(genes_of_interest_file) as f:
 	for line in f:
@@ -13,7 +13,7 @@ with open(genes_of_interest_file) as f:
 		out.write("DATASET_BINARY\nSEPARATOR COMMA\nDATASET_LABEL," + name + "\nCOLOR,#ff0000\nFIELD_SHAPES,1\nFIELD_LABELS,f1\nDATA\n")
 
 
-		with open("/Users/gh11/poppunk_pangenome/X_choose_reps/270619_chosen_treemer.csv") as f:
+		with open("/Users/gh11/poppunk_pangenome/X_choose_reps/270619_chosen_treemer_corrected.csv") as f:
 			for line in f:
 				toks = line.strip().split(",")
 				if line.startswith("Name"):

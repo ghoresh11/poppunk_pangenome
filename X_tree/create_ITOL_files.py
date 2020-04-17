@@ -15,7 +15,7 @@ cols = sns.color_palette("Set2").as_hex()
 cols = cols + [cols[7], cols[7]]
 phylogroup_cols = {}
 index = 0
-for p in ["B2", "B1", "A", "D", "E", "C", "F", "Undefined", "U", "U/cryptic"]:
+for p in ["B2", "B1", "A", "D", "E", "C", "F", "Shigella", "U"]:
 	phylogroup_cols[p] = cols[index]
 	index += 1
 
@@ -26,7 +26,7 @@ shapes = {"15": [1, 1], "12": [1,0], "7": [5,1],
 			"9": [2,1], "5": [2,0],
 			"8": [5,0], "4": [2,0] }
 
-with open("/Users/gh11/Submissions/my_thesis/Chapter3/figures/cluster_graphics.csv") as f:
+with open("/Users/gh11/Submissions/my_thesis/Chapter4/figures/cluster_graphics.csv") as f:
 	for line in f:
 		if line.startswith("Cluster"):
 			continue
@@ -34,7 +34,7 @@ with open("/Users/gh11/Submissions/my_thesis/Chapter3/figures/cluster_graphics.c
 		cluster_cols[toks[0]] = {"color": toks[2], "shape":shapes[toks[3]]}
 
 
-with open("/Users/gh11/poppunk_pangenome/X_choose_reps/270619_chosen_treemer.csv") as f:
+with open("/Users/gh11/poppunk_pangenome/X_choose_reps/270619_chosen_treemer_corrected.csv") as f:
 	for line in f:
 		toks = line.strip().split(",")
 		if line.startswith("Name"):

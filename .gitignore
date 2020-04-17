@@ -86,6 +86,14 @@ X_eggnog/*.csv
 10_gene_sharing/graphs*
 10_gene_sharing/sharing_on_tree/randoms/*
 
+11_ancestral_state_recon/inputs/
+11_ancestral_state_recon/results/
+11_ancestral_state_recon/*.tab
+11_ancestral_state_recon/pyjar*
+11_ancestral_state_recon/*nwk
+
+*RData
+
 */*.csv
 */*/*.csv
 */*/*/*.csv

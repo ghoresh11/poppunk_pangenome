@@ -34,6 +34,12 @@ within_distances = read.table("all/within_cluster_dist.csv", sep = ",",
 between_distances = read.table("all/between_cluster_dist.csv", sep = ",",
                                header = T, stringsAsFactors = F, comment.char = "")
 
+## analysing cluster 12
+cluster_12 = between_distances[which(between_distances$cluster1 == 12 | between_distances$cluster2 == 12),]
+cluster_12 = between_distances[which(between_distances$cluster1 %in% c(12,28,35) & between_distances$cluster2 %in% c(12,28,35)),]
+
+
+
 chosen = cluster_sizes$Cluster[which(cluster_sizes$Size >= 20)]
 
 ## add a color specifying which clusters I kept in the analysis
@@ -188,8 +194,8 @@ ggplot(roary_outputs, aes(y = count, x = size, fill = variable)) +
 D = ggplot(roary_outputs, aes(y = count, x = size, fill = variable)) + 
   geom_point(size = 3, pch=21, color = "black", alpha = 0.7) +
   theme_bw(base_size = 12) + xlab("Cluster size") + ylab("Genes") +
-  scale_fill_manual(values = cols, guide = F) +  geom_smooth(method = "gam", formula = y ~ s(log(x)), aes(color = variable)) +
-  scale_color_manual(values = cols, guide = F) + ggtitle("E")
+  scale_fill_manual(values = cols, guide = F) +  geom_smooth(method = "lm", aes(color = variable)) +
+  scale_color_manual(values = cols, guide = F) + ggtitle("D") + scale_x_log10()
 D
 
 ## add distances

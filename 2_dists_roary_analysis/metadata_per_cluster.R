@@ -4,7 +4,7 @@ library(reshape2)
 
 setwd("/Users/gh11/poppunk_pangenome/2_dists_roary_analysis/")
 
-metadata = read.table("metadata_per_cluster.csv", sep = "\t",
+metadata = read.table("metadata_per_cluster.csv", sep = ",",
                       header = T, stringsAsFactors = F, comment.char = "")
 
 cluster_order = read.table("cluster_sizes_updated.csv", sep = ",", header = T, stringsAsFactors = F)
@@ -153,14 +153,14 @@ path_stats = statistically_test("Pathotype")
 
 iso_order = rev(c("feces","blood","urine","other/unknown"))
 iso_cols = rev( c(brewer.pal(n = 3, "Set2"),"#dddddd"))
-B= plot_metadata_per_cluster("Isolation", iso_order, iso_cols, "B")
+B= plot_metadata_per_cluster("Isolation", iso_order, iso_cols, "A")
 iso_comp = compare_filtered_to_complete("Isolation")
 iso_stat = statistically_test("Isolation")
 
 
 cont_order = c("Europe", "North America","Africa","Asia","Oceania", "South America","nd")
 cont_cols = c( brewer.pal(n = 6, "Set2"), "#dddddd")
-C = plot_metadata_per_cluster("Continent", cont_order, cont_cols, "C")
+C = plot_metadata_per_cluster("Continent", cont_order, cont_cols, "B")
 cont_comp = compare_filtered_to_complete("Continent")
 cont_stat = statistically_test("Continent")
 
@@ -175,22 +175,27 @@ pub_stat = statistically_test("Publication")
 
 #### YEAR ###
 Year = metadata[which(metadata$variable == "Year" & metadata$value != "nd"),]
+length(which(Year$value>2010))
 Year$cluster = factor(Year$cluster, cluster_order)
 Year$value = as.numeric(Year$value)
-graphics = read.table("/Users/gh11/Submissions/my_thesis/Chapter3/figures/cluster_graphics.csv", sep = ",",
+graphics = read.table("/Users/gh11/Submissions/my_thesis/Chapter4//figures/cluster_graphics.csv", sep = ",",
                       header = T, comment.char = "")
 graphics = graphics[match(cluster_order, graphics$Cluster),]
 
-D = ggplot(Year, aes(x = value, y = count, color = cluster, shape = cluster)) + geom_point(size = 3, alpha = 0.8, stroke = 1)+ 
-  scale_color_manual(values = as.character(graphics$Color), name = "") + scale_shape_manual(values = graphics$Shape, name = "") +
-  theme_bw(base_size = 12) + xlab("Year") + ylab("Fraction of isolates")+  
-  guides(color=guide_legend(ncol=7), shape =guide_legend(ncol = 7)) + ggtitle("D") +guides(color=guide_legend(nrow=6,byrow=TRUE))
+D = ggplot(Year, aes(x = value, y = cluster, size = count)) + geom_point(fill =  "#a9a9a9", pch = 21, color = "black") +
+  scale_size_continuous(range = c(1,8), name = "Fraction of Isolates", breaks = seq(from=0.2, to =1, by =0.2)) +
+  xlab("Year") + ylab("PopPUNK Cluster") + theme_bw(base_size = 14) + ggtitle("C")
+# 
+# D = ggplot(Year, aes(x = value, y = count, color = cluster, shape = cluster)) + geom_point(size = 3, alpha = 0.8, stroke = 1)+ 
+#   scale_color_manual(values = as.character(graphics$Color), name = "") + scale_shape_manual(values = graphics$Shape, name = "") +
+#   theme_bw(base_size = 12) + xlab("Year") + ylab("Fraction of isolates")+  
+#   guides(color=guide_legend(ncol=7), shape =guide_legend(ncol = 7)) + ggtitle("D") +guides(color=guide_legend(nrow=6,byrow=TRUE))
 
 #ggsave(plot =  p, file = paste(outpath, "Year.pdf", sep = ""), height = 5, width = 7)
-
-legend = as_ggplot(get_legend(D))
-legend
-D = D + theme(legend.position = "None")
+# 
+# legend = as_ggplot(get_legend(D))
+# legend
+# D = D + theme(legend.position = "None")
 
 all_years = Year$value
 year_stat = data.frame(cluster = unique(Year$cluster), pval = rep(0, length(unique(Year$cluster))), stringsAsFactors = F)
@@ -210,14 +215,19 @@ wilcox.test(all_years, years_of_cluser)
 lay = rbind(c(NA,NA,NA,NA,3,3),
             c(NA,NA,NA,NA,3,3),
             c(1,1,1,1,1,1),
-            c(1,1,1,1,1,1),
-            c(2,2,2,2,2,2),
             c(2,2,2,2,2,2))
 
 grid.arrange(B,C,D, layout_matrix = lay)
 ## to save as an image: width = 800, height = 800
 ##length(which(md$Poppunk_cluster == "2"))
 
+grid.arrange(B + coord_flip() + theme(legend.position = "None"),
+             C + coord_flip()+ theme(legend.position = "None"),  D +  theme(legend.position = "None"),
+             layout_matrix = rbind(c(1,2,3,3,3)))
+
+grid.arrange(as_ggplot(get_legend(B)),as_ggplot(get_legend(C)), as_ggplot(get_legend(D)))
+
+### save 1000x1300
 # ### Look at the metadata per cluster, stratified
 # 
 # loc = "/lustre/scratch118/infgen/team216/gh11/e_coli_collections/poppunk/dists_analysis/metadata_within_cluster"

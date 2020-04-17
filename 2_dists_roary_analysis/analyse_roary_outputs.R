@@ -3,6 +3,7 @@ library(RColorBrewer)
 library(vegan)
 library(ggpubr)
 library(gridExtra)
+library(micropan)
 
 setwd("/Users/gh11/poppunk_pangenome/2_dists_roary_analysis//")
 
@@ -74,6 +75,28 @@ A0 = ggplot(filtered_md, aes( x = Poppunk_cluster, y = num_new_genes))  +
 #                                  sd = sp$sd))
 # }
 ## save the output
+
+# ## estimate the slope?
+# # ## gene accumilation curves using vegan
+# df = data.frame(cluster = character(0),
+#                 alpha = numeric(0),
+#                 intercept = numeric(0), stringsAsFactors = F)
+# # 
+# files = list.files(path = "gene_presence_absences/", full.names = T, pattern = "*.Rtab")
+# for (f in files){
+#   cluster = strsplit(basename(f), split = "_", fixed = T)[[1]][1]
+#   print(cluster)
+#   mydata <- data.frame(t(read.table(f, header = T, row.names = 1, comment.char = "", quote = )))
+#   h.est <- heaps(mydata)
+# 
+#   df = rbind(df, data.frame(cluster = cluster,
+#                             alpha = h.est[[2]],
+#                             intercept = h.est[[1]],
+#                             stringsAsFactors = F))
+# }
+# ## save the heaps result
+# write.table(x = df, file = "heaps.csv", col.names = T, row.names = F, quote = F, sep = ",")
+
 #write.table(df, "accumilation_curves.csv", col.names = T, row.names = F, quote = F, sep = ',')
 df = read.table("accumilation_curves.csv", header = T, comment.char = "", sep = ",", stringsAsFactors = F)
 df = cbind(df, min= df$richness-df$sd, max = df$richness+df$sd )
@@ -104,7 +127,7 @@ lay = rbind(c(1,1,1,2,2,3,3),
             c(4,4,4,4,4,4,4),
             c(4,4,4,4,4,4,4))
 D
-grid.arrange(A0, A, B, C, layout_matrix = lay)
+grid.arrange(  B + ggtitle("B"), C, layout_matrix = lay)
 ## Add the legends separately...
 ## To save: height = 630 width = 880
 # 

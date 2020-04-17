@@ -81,6 +81,7 @@ X_eggnog/*.csv
 10_gene_sharing/plots*
 10_gene_sharing/*/*.txt
 10_gene_sharing/graphs*
+10_gene_sharing/sharing_on_tree/randoms/*
 
 */*.csv
 */*/*.csv

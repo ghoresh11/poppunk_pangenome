@@ -93,13 +93,6 @@ generate_one_plot <- function(column) {
 plot_one_genetype_against_dist <- function(gene_type, title, get_legend = F) {
   ## plot the number of genes shared compared to phylogenetic distance
   all = edges[which(edges$Gene_class == gene_type),]
-  all$label_a = paste(all$ClusterA, all$ClusterB, sep = "-")
-  all$label_b = paste(all$ClusterB, all$ClusterA, sep = "-")
-  all$label = rep("", dim(all)[1])
-  all$label[which(all$label_a %in% distance_matrix.m$label)] = all$label_a[which(all$label_a %in% distance_matrix.m$label)]
-  all$label[which(all$label_b %in% distance_matrix.m$label)] = all$label_b[which(all$label_b %in% distance_matrix.m$label)]
-  all = all[match(distance_matrix.m$label, all$label),]
-  all$distance = distance_matrix.m$dist
   
   all$Count_normalised = (all$Count - min(all$Count)) /(max(all$Count) - min(all$Count))
   all$phylo = factor(all$phylo, c("B1","C","A","E","D","B2","F","U","Different"))
@@ -109,6 +102,7 @@ plot_one_genetype_against_dist <- function(gene_type, title, get_legend = F) {
     text_colour = "black"
   }
   max_colour = colours$Colour[colours$Class == gene_type]
+  print(summary(lm(data = all, distance~Count)))
   
   p = ggplot(all, aes(x = distance, y = Count, fill = phylo)) + geom_point(size = 3, pch = 21, alpha = 0.7) +
     xlab("Phylogenetic distance") + ylab("Number of shared genes") +
@@ -131,6 +125,7 @@ plot_one_genetype_against_min_size <-  function(gene_type, title, get_legend = F
     text_colour = "black"
   }
   max_colour = colours$Colour[colours$Class == gene_type]
+  print(summary(lm(data = curr, min~Count)))
   p = ggplot(curr, aes(x = min, y = Count, fill = phylo)) + geom_point(size = 3, pch = 21, alpha = 0.9) +
     xlab("Smaller cluster size") + ylab("Shared genes") +
     theme_bw(base_size = 14) + ggtitle(gene_type) + scale_fill_manual(values = c(brewer.pal(n=7,"Set2"),"brown","#d3d3d3"), 
@@ -158,12 +153,21 @@ cluster_sizes = read.table("../2_dists_roary_analysis/cluster_sizes_updated.csv"
 edges$sizeA = cluster_sizes$Size[match(edges$ClusterA, cluster_sizes$Cluster)]
 edges$sizeB = cluster_sizes$Size[match(edges$ClusterB, cluster_sizes$Cluster)]
 edges  = transform(edges, min = pmin(edges$sizeA , edges$sizeB))
+edges  = transform(edges, max = pmax(edges$sizeA , edges$sizeB))
 
 ## add phylogroup info
 edges$phyloA = cluster_graphics$Phylogroup[match(edges$ClusterA, cluster_graphics$Cluster)]
 edges$phyloB = cluster_graphics$Phylogroup[match(edges$ClusterB, cluster_graphics$Cluster)]
 edges$phylo = rep("Different", dim(edges)[1])
 edges$phylo[which(edges$phyloA == edges$phyloB)] = edges$phyloA[which(edges$phyloA == edges$phyloB)]
+
+## add distance
+edges$label_a = paste(edges$ClusterA, edges$ClusterB, sep = "-")
+edges$label_b = paste(edges$ClusterB, edges$ClusterA, sep = "-")
+edges$label = rep("", dim(edges)[1])
+edges$label[which(edges$label_a %in% distance_matrix.m$label)] = edges$label_a[which(edges$label_a %in% distance_matrix.m$label)]
+edges$label[which(edges$label_b %in% distance_matrix.m$label)] = edges$label_b[which(edges$label_b %in% distance_matrix.m$label)]
+edges$distance =  distance_matrix.m$dist[match(edges$label, distance_matrix.m$label)]
 
 ## Run on one gene_type
 all_classes = unique(edges$Gene_class)
@@ -225,15 +229,13 @@ core_inter_rare = plot_one_genetype_against_dist("Core, intermediate and rare","
 inter_and_rare = plot_one_genetype_against_dist("Intermediate and rare","")
 
 
-
-
 ## extract the legend from the first plot
 legend = as_ggplot(get_legend(core))
 core = core + theme(legend.position = "None")
 
-## plot all og them 
-grid.arrange(core, intermediate, rare, legend, core_and_inter,core_and_rare,
-             core_inter_rare,  inter_and_rare, nrow = 2)
+# ## plot all og them 
+# grid.arrange(core, intermediate, rare, legend, core_and_inter,core_and_rare,
+#              core_inter_rare,  inter_and_rare, nrow = 2)
 
 
 core2 = plot_one_genetype_against_min_size("Multi-cluster core", "A")
@@ -244,11 +246,49 @@ core_and_rare2 = plot_one_genetype_against_min_size("Core and rare","E")
 core_inter_rare2 = plot_one_genetype_against_min_size("Core, intermediate and rare","F")
 inter_and_rare2 = plot_one_genetype_against_min_size("Intermediate and rare","G")
 
-grid.arrange(core2, intermediate2, rare2,legend,
-             core_and_inter2,
-             core_inter_rare2, core_and_rare2, inter_and_rare2, nrow = 2)
+# grid.arrange(core2, intermediate2, rare2,legend,
+#              core_and_inter2,
+#              core_inter_rare2, core_and_rare2, inter_and_rare2, nrow = 2)
+
+## check if some are sharing more than expected based on size and distance
+test = edges[which(edges$Gene_class %in% c("Multi-cluster rare","Intermediate and rare", "Core, intermediate and rare")),]
+
+## create new DF and sum up all three gene classes
+test = aggregate(x = test$Count, by = list(test$label), FUN = sum) 
+test$distance = edges$distance[match(test$Group.1, edges$label)]
+test$min = edges$min[match(test$Group.1, edges$label)]
+test$max = edges$max[match(test$Group.1, edges$label)]
 
 
+## add the names of each cluster and duplicate the df
+test$cluster = sapply(X = sapply(FUN = strsplit,  X = test$Group.1, split = "-", fixed = T), FUN = head, n = 1)
+test_copy = test
+test_copy$cluster = sapply(X = sapply(FUN = strsplit,  X = test$Group.1, split = "-", fixed = T), FUN = tail, n = 1)
+test = rbind(test, test_copy)
 
+## remove cluster comparisons which are phylogenetically close
+test = test[-which(test$distance < 0.4),]
+
+## factor
+test$cluster = factor(test$cluster, cluster_sizes$Cluster[order(cluster_sizes$Size, decreasing = T)])
+
+## get median, min and max
+median_df = aggregate(x = test$x, by = list(test$cluster), median)
+median_df$size = cluster_sizes$Size[match(median_df$Group.1, cluster_sizes$Cluster)]
+
+## to get linear regression
+summary(lm(data = median_df, x ~ log10(size)))
+
+median_df$estimate = 118.37 + 568.33*log10(median_df$size)
+median_df$label = rep("", dim(median_df)[1])
+median_df$label[median_df$estimate < median_df$x - 200] = as.character(median_df$Group.1)[median_df$estimate < median_df$x - 200]
+median_df$label[median_df$estimate > median_df$x + 200] = as.character(median_df$Group.1)[median_df$estimate > median_df$x + 200]
+
+A = ggplot(median_df, aes(x = size, y = x, label = label)) + 
+  geom_text(position = position_nudge(x = 0.1, y = 0.1)) +
+  geom_point()+ scale_x_log10()+ 
+  geom_smooth(method='lm', color = "black") + theme_bw(base_size = 14) + xlab("PopPUNK cluster size") + 
+  ylab("Number of low frequency genes shared") + ggtitle("A")
+A
 
 
